@@ -239,29 +239,34 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
-		goto err_parent;
+		goto err_dev;
 	}
 
 	root = udev_device_get_syspath(p);
-	snum = udev_device_get_sysnum(p);
-	num = snum ? atoi(snum) : -1;
-	if (!root || num < 0) {
+	snum = udev_device_get_sysname(p);
+	snum = snum ? strchr(snum, '.') : NULL;
+	if (!root || !snum) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get udev paths\n");
 		ret = FALSE;
-		goto err_parent;
+		goto err_dev;
+	}
+
+	num = strtol(&snum[1], NULL, 16);
+	if (num < 0) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Invalid device id\n");
+		ret = FALSE;
+		goto err_dev;
 	}
 
 	dev->root = strdup(root);
 	if (!dev->root) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot allocate memory\n");
 		ret = FALSE;
-		goto err_parent;
+		goto err_dev;
 	}
 
 	dev->dev_id = num;
 
-err_parent:
-	udev_device_unref(p);
 err_dev:
 	udev_device_unref(d);
 err_udev:
