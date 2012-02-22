@@ -155,16 +155,12 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 	dev = info->private;
 	switch (what) {
 		case DEVICE_INIT:
-			xf86IDrvMsg(dev->info, X_INFO, "Init\n");
 			return xwiimote_init(dev);
 		case DEVICE_ON:
-			xf86IDrvMsg(dev->info, X_INFO, "On\n");
 			return xwiimote_on(dev, device);
 		case DEVICE_OFF:
-			xf86IDrvMsg(dev->info, X_INFO, "Off\n");
 			return xwiimote_off(dev, device);
 		case DEVICE_CLOSE:
-			xf86IDrvMsg(dev->info, X_INFO, "Close\n");
 			return xwiimote_close(dev);
 		default:
 			return BadValue;
