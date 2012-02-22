@@ -313,6 +313,7 @@ err_dev:
 	free(dev->root);
 err_free:
 	free(dev);
+	info->private = NULL;
 	return ret;
 }
 
