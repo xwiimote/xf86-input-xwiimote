@@ -27,6 +27,7 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
 #include <libudev.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,9 +136,12 @@ static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 	InputInfoPtr info = device->public.devicePrivate;
 
 	device->public.on = FALSE;
-	xf86RemoveEnabledDevice(info);
-	xwii_iface_close(dev->iface, XWII_IFACE_ALL);
-	info->fd = -1;
+
+	if (info->fd >= 0) {
+		xf86RemoveEnabledDevice(info);
+		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
+		info->fd = -1;
+	}
 
 	return Success;
 }
@@ -169,6 +173,26 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 
 static void xwiimote_input(InputInfoPtr info)
 {
+	struct xwiimote_dev *dev;
+	struct xwii_event ev;
+	int ret;
+
+	dev = info->private;
+
+	do {
+		memset(&ev, 0, sizeof(ev));
+		ret = xwii_iface_read(dev->iface, &ev);
+		if (ret)
+			break;
+		/* handle data in \ev */
+	} while (!ret);
+
+	if (ret != -EAGAIN) {
+		xf86IDrvMsg(info, X_INFO, "Device disconnected\n");
+		xf86RemoveEnabledDevice(info);
+		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
+		info->fd = -1;
+	}
 }
 
 /*
