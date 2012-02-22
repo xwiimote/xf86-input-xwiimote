@@ -40,7 +40,7 @@ AM_CONFIG_HEADER([config.h])
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_PROG_CC
-XORG_DEFAULT_OPTIONS
+AC_CHECK_FUNCS([ffs])
 
 m4_ifndef([XORG_MACROS_VERSION],
           [AC_FATAL([xorg-macros 1.8 or later required])])
