@@ -112,13 +112,33 @@ static int xwiimote_close(struct xwiimote_dev *dev)
 	return Success;
 }
 
-static int xwiimote_on(struct xwiimote_dev *dev)
+static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+	int ret;
+	InputInfoPtr info = device->public.devicePrivate;
+
+	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL);
+	if (ret) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot open interface\n");
+		return BadValue;
+	}
+
+	info->fd = xwii_iface_get_fd(dev->iface);
+	xf86AddEnabledDevice(info);
+	device->public.on = TRUE;
+
 	return Success;
 }
 
-static int xwiimote_off(struct xwiimote_dev *dev)
+static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+	InputInfoPtr info = device->public.devicePrivate;
+
+	device->public.on = FALSE;
+	xf86RemoveEnabledDevice(info);
+	xwii_iface_close(dev->iface, XWII_IFACE_ALL);
+	info->fd = -1;
+
 	return Success;
 }
 
@@ -131,12 +151,16 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 	dev = info->private;
 	switch (what) {
 		case DEVICE_INIT:
+			xf86IDrvMsg(dev->info, X_INFO, "Init\n");
 			return xwiimote_init(dev);
 		case DEVICE_ON:
-			return xwiimote_on(dev);
+			xf86IDrvMsg(dev->info, X_INFO, "On\n");
+			return xwiimote_on(dev, device);
 		case DEVICE_OFF:
-			return xwiimote_off(dev);
+			xf86IDrvMsg(dev->info, X_INFO, "Off\n");
+			return xwiimote_off(dev, device);
 		case DEVICE_CLOSE:
+			xf86IDrvMsg(dev->info, X_INFO, "Close\n");
 			return xwiimote_close(dev);
 		default:
 			return BadValue;
