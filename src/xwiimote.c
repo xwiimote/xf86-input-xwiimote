@@ -203,8 +203,19 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		goto err_free;
 	}
 
+	/* Check for duplicate */
+	if (xwiimote_is_dev(dev)) {
+		xf86IDrvMsg(info, X_ERROR, "Device already registered\n");
+		ret = BadMatch;
+		goto err_dev;
+	}
+
+	xwiimote_add_dev(dev);
+
 	return Success;
 
+err_dev:
+	free(dev->root);
 err_free:
 	free(dev);
 	return ret;
@@ -219,6 +230,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	if (info->private) {
 		dev = info->private;
+		xwiimote_rm_dev(dev);
 		free(dev->root);
 		free(dev);
 		info->private = NULL;
