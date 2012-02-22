@@ -27,7 +27,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = \
 	README \
-	COPYING
+	COPYING \
+	60-xorg-xwiimote.conf
 
 AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS)
 
