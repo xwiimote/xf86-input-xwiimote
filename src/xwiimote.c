@@ -46,6 +46,7 @@ struct xwiimote_dev {
 	int dev_id;
 	char *root;
 	char *device;
+	bool dup;
 	struct xwii_iface *iface;
 };
 
@@ -153,6 +154,9 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 
 	info = device->public.devicePrivate;
 	dev = info->private;
+	if (dev->dup)
+		return Success;
+
 	switch (what) {
 		case DEVICE_INIT:
 			return xwiimote_init(dev);
@@ -174,6 +178,8 @@ static void xwiimote_input(InputInfoPtr info)
 	int ret;
 
 	dev = info->private;
+	if (dev->dup)
+		return;
 
 	do {
 		memset(&ev, 0, sizeof(ev));
@@ -301,9 +307,8 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	/* Check for duplicate */
 	if (xwiimote_is_dev(dev)) {
-		xf86IDrvMsg(info, X_ERROR, "Device already registered\n");
-		ret = BadMatch;
-		goto err_dev;
+		dev->dup = true;
+		return Success;
 	}
 
 	xwiimote_add_dev(dev);
@@ -327,7 +332,9 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	if (info->private) {
 		dev = info->private;
-		xwiimote_rm_dev(dev);
+		if (!dev->dup) {
+			xwiimote_rm_dev(dev);
+		}
 		free(dev->root);
 		free(dev);
 		info->private = NULL;
