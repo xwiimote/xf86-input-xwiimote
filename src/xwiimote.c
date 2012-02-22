@@ -318,8 +318,6 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	return Success;
 
-err_dev:
-	free(dev->root);
 err_free:
 	free(dev);
 	info->private = NULL;
