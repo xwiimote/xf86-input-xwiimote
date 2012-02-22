@@ -37,8 +37,54 @@
 static char xwiimote_name[] = "xwiimote";
 
 struct xwiimote_dev {
+	int dev_id;
 	char *device;
 };
+
+/* List of all devices we know about to avoid duplicates */
+static struct xwiimote_dev *xwiimote_devices[MAXDEVICES] = { NULL };
+
+static BOOL xwiimote_is_dev(struct xwiimote_dev *dev)
+{
+	struct xwiimote_dev **iter = xwiimote_devices;
+
+	if (dev->dev_id >= 0) {
+		while (*iter) {
+			if (dev != *iter && (*iter)->dev_id == dev->dev_id)
+				return TRUE;
+			iter++;
+		}
+	}
+
+	return FALSE;
+}
+
+static void xwiimote_add_dev(struct xwiimote_dev *dev)
+{
+	struct xwiimote_dev **iter = xwiimote_devices;
+
+	while (*iter)
+		iter++;
+
+	*iter = dev;
+}
+
+static void xwiimote_rm_dev(struct xwiimote_dev *dev)
+{
+	unsigned int num = 0;
+	struct xwiimote_dev **iter = xwiimote_devices;
+
+	while (*iter) {
+		++num;
+		if (*iter == dev) {
+			memmove(iter, iter + 1,
+					sizeof(xwiimote_devices) -
+					(num * sizeof(*dev)));
+			break;
+		}
+		iter++;
+	}
+}
 
 static int xwiimote_control(DeviceIntPtr device, int what)
 {
@@ -59,6 +105,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		return BadAlloc;
 
 	memset(dev, 0, sizeof(*dev));
+	dev->dev_id = -1;
 	info->private = dev;
 	info->device_control = xwiimote_control;
 	info->read_input = xwiimote_input;
