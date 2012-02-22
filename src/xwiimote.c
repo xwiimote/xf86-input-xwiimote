@@ -27,7 +27,10 @@
 #include "config.h"
 #endif
 
+#include <libudev.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <xf86.h>
 #include <xf86Module.h>
 #include <xf86Xinput.h>
@@ -37,7 +40,9 @@
 static char xwiimote_name[] = "xwiimote";
 
 struct xwiimote_dev {
+	InputInfoPtr info;
 	int dev_id;
+	char *root;
 	char *device;
 };
 
@@ -95,6 +100,80 @@ static void xwiimote_input(InputInfoPtr info)
 {
 }
 
+/*
+ * Check whether the device is actually a Wii Remote device and then retrieve
+ * the sys-root of the HID device with the device-id.
+ * Return TRUE if the device is a valid Wii Remote device.
+ */
+static BOOL xwiimote_validate(struct xwiimote_dev *dev)
+{
+	struct udev *udev;
+	struct udev_device *d, *p;
+	struct stat st;
+	BOOL ret = TRUE;
+	const char *root, *snum, *hid;
+	int num;
+
+	udev = udev_new();
+	if (!udev) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot create udev device\n");
+		return FALSE;
+	}
+
+	if (stat(dev->device, &st)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get device info\n");
+		ret = FALSE;
+		goto err_udev;
+	}
+
+	d = udev_device_new_from_devnum(udev, 'c', st.st_rdev);
+	if (!d) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get udev device\n");
+		ret = FALSE;
+		goto err_udev;
+	}
+
+	p = udev_device_get_parent_with_subsystem_devtype(d, "hid", NULL);
+	if (!p) {
+		xf86IDrvMsg(dev->info, X_ERROR, "No HID device\n");
+		ret = FALSE;
+		goto err_dev;
+	}
+
+	hid = udev_device_get_property_value(p, "HID_ID");
+	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
+		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
+		ret = FALSE;
+		goto err_parent;
+	}
+
+	root = udev_device_get_syspath(p);
+	snum = udev_device_get_sysnum(p);
+	num = snum ? atoi(snum) : -1;
+	if (!root || num < 0) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get udev paths\n");
+		ret = FALSE;
+		goto err_parent;
+	}
+
+	dev->root = strdup(root);
+	if (!dev->root) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot allocate memory\n");
+		ret = FALSE;
+		goto err_parent;
+	}
+
+	dev->dev_id = num;
+
+err_parent:
+	udev_device_unref(p);
+err_dev:
+	udev_device_unref(d);
+err_udev:
+	udev_unref(udev);
+	return ret;
+}
+
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 {
 	struct xwiimote_dev *dev;
@@ -105,6 +184,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		return BadAlloc;
 
 	memset(dev, 0, sizeof(*dev));
+	dev->info = info;
 	dev->dev_id = -1;
 	info->private = dev;
 	info->device_control = xwiimote_control;
@@ -114,6 +194,11 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
 		xf86IDrvMsg(info, X_ERROR, "No Device specified\n");
+		ret = BadMatch;
+		goto err_free;
+	}
+
+	if (!xwiimote_validate(dev)) {
 		ret = BadMatch;
 		goto err_free;
 	}
@@ -134,6 +219,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	if (info->private) {
 		dev = info->private;
+		free(dev->root);
 		free(dev);
 		info->private = NULL;
 	}
