@@ -2,4 +2,4 @@
 
 mkdir -p m4/
 autoreconf -i || exit 1
-./configure $*
+./configure --prefix=/usr $*
