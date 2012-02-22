@@ -306,10 +306,13 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 
 	/* Check for duplicate */
-	if (xwiimote_is_dev(dev)) {
+	if (!dev->info->name || strcmp(dev->info->name, XWII_NAME_CORE) ||
+							xwiimote_is_dev(dev)) {
+		xf86IDrvMsg(dev->info, X_INFO, "No core device\n");
 		dev->dup = true;
 		return Success;
 	}
+	xf86IDrvMsg(dev->info, X_INFO, "Is a core device\n");
 
 	xwiimote_add_dev(dev);
 
