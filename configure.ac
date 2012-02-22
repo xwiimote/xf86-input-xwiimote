@@ -55,6 +55,10 @@ AC_ARG_WITH(xorg-module-dir,
 inputdir=${moduledir}/input
 AC_SUBST(inputdir)
 
+PKG_CHECK_MODULES(SYSDEP, libudev libxwiimote)
+AC_SUBST(SYSDEP_CFLAGS)
+AC_SUBST(SYSDEP_LIBS)
+
 PKG_CHECK_MODULES(XORG, xorg-server xproto)
 XORG_CFLAGS="$CWARNFLAGS $XORG_CFLAGS"
 

@@ -36,6 +36,7 @@
 #include <xf86Xinput.h>
 #include <xorg-server.h>
 #include <xorgVersion.h>
+#include <xwiimote.h>
 
 static char xwiimote_name[] = "xwiimote";
 
@@ -44,6 +45,7 @@ struct xwiimote_dev {
 	int dev_id;
 	char *root;
 	char *device;
+	struct xwii_iface *iface;
 };
 
 /* List of all devices we know about to avoid duplicates */
@@ -91,9 +93,54 @@ static void xwiimote_rm_dev(struct xwiimote_dev *dev)
 	}
 }
 
-static int xwiimote_control(DeviceIntPtr device, int what)
+static int xwiimote_init(struct xwiimote_dev *dev)
+{
+	int ret;
+
+	ret = xwii_iface_new(&dev->iface, dev->root);
+	if (ret) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot alloc interface\n");
+		return BadValue;
+	}
+
+	return Success;
+}
+
+static int xwiimote_close(struct xwiimote_dev *dev)
+{
+	xwii_iface_unref(dev->iface);
+	return Success;
+}
+
+static int xwiimote_on(struct xwiimote_dev *dev)
 {
 	return Success;
+}
+
+static int xwiimote_off(struct xwiimote_dev *dev)
+{
+	return Success;
+}
+
+static int xwiimote_control(DeviceIntPtr device, int what)
+{
+	struct xwiimote_dev *dev;
+	InputInfoPtr info;
+
+	info = device->public.devicePrivate;
+	dev = info->private;
+	switch (what) {
+		case DEVICE_INIT:
+			return xwiimote_init(dev);
+		case DEVICE_ON:
+			return xwiimote_on(dev);
+		case DEVICE_OFF:
+			return xwiimote_off(dev);
+		case DEVICE_CLOSE:
+			return xwiimote_close(dev);
+		default:
+			return BadValue;
+	}
 }
 
 static void xwiimote_input(InputInfoPtr info)
