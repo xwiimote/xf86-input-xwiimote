@@ -177,7 +177,7 @@ static int xwiimote_prepare_key(struct xwiimote_dev *dev, DeviceIntPtr device)
 		cp_opt(dev, "XkbVariant", &dev->rmlvo.variant);
 	cp_opt(dev, "xkb_options", &dev->rmlvo.options);
 	if (!dev->rmlvo.options)
-	cp_opt(dev, "XkbOptions", &dev->rmlvo.options);
+		cp_opt(dev, "XkbOptions", &dev->rmlvo.options);
 
 	if (!InitKeyboardDeviceStruct(device, &dev->rmlvo, NULL, NULL))
 		return BadValue;
