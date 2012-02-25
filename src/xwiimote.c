@@ -46,6 +46,26 @@
 
 static char xwiimote_name[] = "xwiimote";
 
+enum func_type {
+	FUNC_IGNORE,
+	FUNC_BTN,
+	FUNC_KEY,
+};
+
+struct func {
+	int type;
+	union {
+		int btn;
+		unsigned int key;
+	};
+};
+
+enum motion_type {
+	MOTION_NONE,
+	MOTION_ABS,
+	MOTION_REL,
+};
+
 struct xwiimote_dev {
 	InputInfoPtr info;
 	void *handler;
@@ -56,6 +76,8 @@ struct xwiimote_dev {
 	struct xwii_iface *iface;
 
 	XkbRMLVOSet rmlvo;
+	unsigned int motion;
+	struct func map_key[XWII_KEY_NUM];
 };
 
 /* List of all devices we know about to avoid duplicates */
@@ -237,14 +259,50 @@ static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 	return Success;
 }
 
+static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	unsigned int code;
+	unsigned int state;
+	unsigned int key;
+	int btn;
+	int absolute = 0;
+
+	code = ev->v.key.code;
+	state = ev->v.key.state;
+	if (code >= XWII_KEY_NUM)
+		return;
+	if (state > 1)
+		return;
+
+	if (dev->motion == MOTION_ABS)
+		absolute = 1;
+
+	switch (dev->map_key[code].type) {
+		case FUNC_BTN:
+			btn = dev->map_key[code].btn;
+			xf86PostButtonEvent(dev->info->dev, absolute, btn,
+								state, 0, 0);
+			break;
+		case FUNC_KEY:
+			key = dev->map_key[code].key;
+			xf86PostKeyboardEvent(dev->info->dev, key, state);
+			break;
+		case FUNC_IGNORE:
+			/* fallthrough */
+		default:
+			break;
+	}
+}
+
 static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
 	int32_t x, y;
 
-	x = ev->v.abs[0].x;
-	y = -1 * ev->v.abs[0].y;
-
-	xf86PostMotionEvent(dev->info->dev, Absolute, 0, 2, x, y);
+	if (dev->motion == MOTION_ABS) {
+		x = ev->v.abs[0].x;
+		y = -1 * ev->v.abs[0].y;
+		xf86PostMotionEvent(dev->info->dev, Absolute, 0, 2, x, y);
+	}
 }
 
 static void xwiimote_input(int fd, pointer data)
@@ -265,6 +323,9 @@ static void xwiimote_input(int fd, pointer data)
 			break;
 
 		switch (ev.type) {
+			case XWII_EVENT_KEY:
+				xwiimote_key(dev, &ev);
+				break;
 			case XWII_EVENT_ACCEL:
 				xwiimote_accel(dev, &ev);
 				break;
