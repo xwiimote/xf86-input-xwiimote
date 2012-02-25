@@ -31,6 +31,7 @@
 #include <exevents.h>
 #include <inttypes.h>
 #include <libudev.h>
+#include <linux/input.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -60,6 +61,20 @@ struct func {
 		int btn;
 		unsigned int key;
 	};
+};
+
+static struct func map_key_default[XWII_KEY_NUM] = {
+	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .key = KEY_LEFT },
+	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .key = KEY_RIGHT },
+	[XWII_KEY_UP] = { .type = FUNC_KEY, .key = KEY_UP },
+	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .key = KEY_DOWN },
+	[XWII_KEY_A] = { .type = FUNC_KEY, .key = KEY_ENTER },
+	[XWII_KEY_B] = { .type = FUNC_KEY, .key = KEY_SPACE },
+	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .key = KEY_VOLUMEUP },
+	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .key = KEY_VOLUMEDOWN },
+	[XWII_KEY_HOME] = { .type = FUNC_KEY, .key = KEY_ESC },
+	[XWII_KEY_ONE] = { .type = FUNC_KEY, .key = KEY_1 },
+	[XWII_KEY_TWO] = { .type = FUNC_KEY, .key = KEY_2 },
 };
 
 enum motion_type {
@@ -496,6 +511,22 @@ err_udev:
 	return ret;
 }
 
+static void xwiimote_configure(struct xwiimote_dev *dev)
+{
+	const char *motion;
+
+	memcpy(dev->map_key, map_key_default, sizeof(map_key_default));
+
+	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
+	if (!motion)
+		motion = "";
+
+	if (!strcasecmp(motion, "accelerometer")) {
+		dev->motion = MOTION_ABS;
+		dev->motion_source = SOURCE_ACCEL;
+	}
+}
+
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 {
 	struct xwiimote_dev *dev;
@@ -537,6 +568,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	xf86IDrvMsg(dev->info, X_INFO, "Is a core device\n");
 
 	xwiimote_add_dev(dev);
+	xwiimote_configure(dev);
 
 	return Success;
 
