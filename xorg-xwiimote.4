@@ -1,0 +1,205 @@
+.\"
+.\" Written 2012 by David Herrmann
+.\" Dedicated to the Public Domain
+.\"
+.ds q \N'34'
+.TH XORG-XWIIMOTE 4 "xf86-input-xwiimote" "David Herrmann" "X Version 11"
+.SH NAME
+xf86-input-xwiimote \- X.Org Nintendo Wii Remote Input Driver
+.SH SYNOPSIS
+.nf
+.B "Section \*qInputDevice\*q"
+.BI "  Identifier \*q" devname \*q
+.B  "  Driver \*qxwiimote\*q"
+\ \ ...
+.BI "  Option \*qDevice\*q        \*q" devpath \*q
+.BI "  Option \*qMotionSource\*q  \*q" source \*q
+.BI "  Option \*qMapLeft\*q       \*q" val \*q
+.BI "  Option \*qMapRight\*q      \*q" val \*q
+.BI "  Option \*qMapUp\*q         \*q" val \*q
+.BI "  Option \*qMapDown\*q       \*q" val \*q
+.BI "  Option \*qMapA\*q          \*q" val \*q
+.BI "  Option \*qMapB\*q          \*q" val \*q
+.BI "  Option \*qMapPlus\*q       \*q" val \*q
+.BI "  Option \*qMapMinus\*q      \*q" val \*q
+.BI "  Option \*qMapHome\*q       \*q" val \*q
+.BI "  Option \*qMapOne\*q        \*q" val \*q
+.BI "  Option \*qMapTwo\*q        \*q" val \*q
+\ \ ...
+.BI "  Option \*qXkbRules\*q      \*q" rules \*q
+.BI "  Option \*qXkbModel\*q      \*q" model \*q
+.BI "  Option \*qXkbLayout\*q     \*q" layout \*q
+.BI "  Option \*qXkbVariant\*q    \*q" variant \*q
+.BI "  Option \*qXkbOptions\*q    \*q" options \*q
+.B EndSection
+.fi
+.SH DESCRIPTION
+.B xwiimote
+is an Xorg input driver for Nintendo Wii Remotes on Linux. It is based on the
+.B xwiimote
+tools and kernel driver. With this driver you can use the Wii Remote as input
+for any X application including games. It is highly customizable but comes with
+sane default values.
+.br
+The Wii Remote can serve as pointer and keyboard device. The Pointer
+capabilities are disabled by default. The buttons are mapped to sane default
+keys so you can directly use the Wii Remote as input device without configuring
+it.
+.br
+It is recommended that
+.B xwiimote
+devices are configured through the
+.B InputClass
+directive (refer to xorg.conf(5)) instead of manual
+per-device configuration. Devices configured in the
+xorg.conf(5) are not hot-plug capable so use an
+.B InputClass
+instead. This package comes with the default configuration installed as
+.B /etc/X11/xorg.conf.d/60-xwiimotes.conf
+but your distribution may have installed it into other locations. Use this
+default to configure your Wii Remotes.
+
+.SH CONFIGURATION DETAILS
+Please refer to xorg.conf(5) for general configuration
+details and for options that can be used with all input drivers.  This
+section only covers configuration details specific to this driver.
+.PP
+The following driver 
+.B Options
+are supported:
+
+.IP "\fBOption \*qDevice\*q \fP\*qdevpath\*q"
+This specifies the device path to the input event-device of the Wii Remote. This
+is most often a device in /dev/input/eventX. Do not use this option unless you
+want to disable device hot-plug.
+
+.IP "\fBOption \*qMotionSource\*q \fP\*qsource\*q"
+The Wii Remote can be used as motion input device (like a mouse). This selects
+what kind of motion-emulation should be performed. \fBsource\fP can be one of
+\fBaccelerometer\fP or \fBoff\fP. Default is \fBoff\fP which means no
+motion-emulation is done. \fBaccelerometer\fP means that the accelerometer is
+used to calculate current tilt and use this as absolute pointer input. This is
+still
+.B experimental
+and should not be used!
+
+.PP
+The following options specify keymaps for the buttons of a Wii Remote. The
+\fIval\fP field of the options must be one of the linux input-key/btn constants.
+You can find them in
+.B /usr/include/linux/input.h.
+They start with
+.B KEY_*
+or
+.B BTN_*.
+The option is case-insensitive so KEY_ENTER and Key_Enter are the same.
+Additional values are \fBnone\fP, \fBoff\fP, \fB0\fP or \fBfalse\fP to disable
+the given button or \fBleft-button\fP, \fBright-button\fP or \fBmiddle-button\fP
+to emulate mouse-buttons instead of keyboard keys.
+
+.IP "\fBOption \*qMapLeft\*q \fP\*qval\*q"
+Specify the mapping of the
+.B LEFT
+button of the Wii Remote. Default is
+.B KEY_LEFT
+
+.IP "\fBOption \*qMapRight\*q \fP\*qval\*q"
+Specify the mapping of the
+.B RIGHT
+button of the Wii Remote. Default is
+.B KEY_RIGHT
+
+.IP "\fBOption \*qMapUp\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B UP
+button of the Wii Remote. Default is
+.B KEY_UP
+
+.IP "\fBOption \*qMapDown\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B DOWN
+button of the Wii Remote. Default is
+.B KEY_DOWN
+
+.IP "\fBOption \*qMapA\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B A
+button of the Wii Remote. Default is
+.B KEY_ENTER
+
+.IP "\fBOption \*qMapB\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B B
+button of the Wii Remote. Default is
+.B KEY_SPACE
+
+.IP "\fBOption \*qMapPlus\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B PLUS
+button of the Wii Remote. Default is
+.B KEY_VOLUMEUP
+
+.IP "\fBOption \*qMapMinus\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B MINUS
+button of the Wii Remote. Default is
+.B KEY_VOLUMEDOWN
+
+.IP "\fBOption \*qMapHome\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B HOME
+button of the Wii Remote. Default is
+.B KEY_ESC
+
+.IP "\fBOption \*qMapOne\*q \fP\*qval\*q"
+a
+Specify the mapping of the
+.B ONE
+button of the Wii Remote. Default is
+.B KEY_1
+
+.IP "\fBOption \*qMapTwo\*q \fP\*qval\*q"
+Specify the mapping of the
+.B TWO
+button of the Wii Remote. Default is
+.B KEY_2
+
+.PP
+The following options are standard X.org input device options which also apply
+to Wii Remote devices:
+
+.I "\fBOption \*qXkbRules\*q \fP\*qrules\*q"
+.br
+.I "\fBOption \*qXkbModel\*q \fP\*qmodel\*q"
+.br
+.I "\fBOption \*qXkbLayout\*q \fP\*qlayout\*q"
+.br
+.I "\fBOption \*qXkbVariant\*q \fP\*qvariant\*q"
+.br
+.I "\fBOption \*qXkbOptions\*q \fP\*qoptions\*q"
+.RS
+These are the standard Xkb options that select the RMLVO parameters of the
+keyboard. See the Xkb man-pages for more information. Please be aware that
+keymaps are applied to all keys before they are sent to the X clients. So take
+that into account when configuring the other mappings of Wii Remotes.
+.RE
+
+.SH AUTHORS
+David Herrmann <dh.herrmann@googlemail.com>
+.br
+The XWiimote Project: http://github.com/dvdhrm/xwiimote
+.br
+The xf86-input-xwiimote Project: http://github.com/dvdhrm/xf86-input-xwiimote
+
+.SH "SEE ALSO"
+.BR xwiimote (7),
+.BR xorg.conf (5),
+.BR Xorg (1),
+.BR X (7)

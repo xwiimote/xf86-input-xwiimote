@@ -30,6 +30,10 @@ EXTRA_DIST = \
 	COPYING \
 	60-xorg-xwiimote.conf
 
+man_MANS = \
+	xorg-xwiimote.4
+EXTRA_DIST += $(man_MANS)
+
 AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS) -Wno-redundant-decls -Wno-cast-qual
 
 @DRIVER_NAME@_drv_la_LTLIBRARIES = @DRIVER_NAME@_drv.la
