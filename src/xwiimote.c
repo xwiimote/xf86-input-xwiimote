@@ -28,6 +28,8 @@
 #endif
 
 #include <errno.h>
+#include <exevents.h>
+#include <inttypes.h>
 #include <libudev.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +39,7 @@
 #include <xf86Xinput.h>
 #include <xorg-server.h>
 #include <xorgVersion.h>
+#include <xserver-properties.h>
 #include <xwiimote.h>
 
 static char xwiimote_name[] = "xwiimote";
@@ -96,7 +99,41 @@ static void xwiimote_rm_dev(struct xwiimote_dev *dev)
 	}
 }
 
-static int xwiimote_init(struct xwiimote_dev *dev)
+static int xwiimote_prepare_abs(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	Atom *atoms;
+	int i, num, ret = Success;
+	char absx[] = AXIS_LABEL_PROP_ABS_X;
+	char absy[] = AXIS_LABEL_PROP_ABS_Y;
+
+	num = 2;
+	atoms = malloc(sizeof(*atoms) * num);
+	if (!atoms)
+		return BadAlloc;
+
+	memset(atoms, 0, sizeof(*atoms) * num);
+	atoms[0] = XIGetKnownProperty(absx);
+	atoms[1] = XIGetKnownProperty(absy);
+
+	if (!InitValuatorClassDeviceStruct(device, num, atoms,
+					GetMotionHistorySize(), Absolute)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init valuators\n");
+		ret = BadValue;
+		goto err_out;
+	}
+
+	for (i = 0; i < num; ++i) {
+		xf86InitValuatorAxisStruct(device, i, atoms[i],
+						-100, 100, 0, 0, 0, Absolute);
+		xf86InitValuatorDefaults(device, i);
+	}
+
+err_out:
+	free(atoms);
+	return ret;
+}
+
+static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
 
@@ -106,13 +143,29 @@ static int xwiimote_init(struct xwiimote_dev *dev)
 		return BadValue;
 	}
 
+	ret = xwiimote_prepare_abs(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
+	}
+
 	return Success;
 }
 
-static int xwiimote_close(struct xwiimote_dev *dev)
+static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	xwii_iface_unref(dev->iface);
 	return Success;
+}
+
+static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	int32_t x, y;
+
+	x = ev->v.abs[0].x;
+	y = -1 * ev->v.abs[0].y;
+
+	xf86PostMotionEvent(dev->info->dev, Absolute, 0, 2, x, y);
 }
 
 static void xwiimote_input(int fd, pointer data)
@@ -131,6 +184,12 @@ static void xwiimote_input(int fd, pointer data)
 		ret = xwii_iface_read(dev->iface, &ev);
 		if (ret)
 			break;
+
+		switch (ev.type) {
+			case XWII_EVENT_ACCEL:
+				xwiimote_accel(dev, &ev);
+				break;
+		}
 	} while (!ret);
 
 	if (ret != -EAGAIN) {
@@ -191,13 +250,13 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 
 	switch (what) {
 		case DEVICE_INIT:
-			return xwiimote_init(dev);
+			return xwiimote_init(dev, device);
 		case DEVICE_ON:
 			return xwiimote_on(dev, device);
 		case DEVICE_OFF:
 			return xwiimote_off(dev, device);
 		case DEVICE_CLOSE:
-			return xwiimote_close(dev);
+			return xwiimote_close(dev, device);
 		default:
 			return BadValue;
 	}
