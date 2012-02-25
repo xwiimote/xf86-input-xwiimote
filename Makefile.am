@@ -30,7 +30,7 @@ EXTRA_DIST = \
 	COPYING \
 	60-xorg-xwiimote.conf
 
-AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS)
+AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS) -Wno-redundant-decls -Wno-cast-qual
 
 @DRIVER_NAME@_drv_la_LTLIBRARIES = @DRIVER_NAME@_drv.la
 @DRIVER_NAME@_drv_la_LDFLAGS = -module -avoid-version
