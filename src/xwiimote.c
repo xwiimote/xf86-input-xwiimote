@@ -68,6 +68,11 @@ enum motion_type {
 	MOTION_REL,
 };
 
+enum motion_source {
+	SOURCE_NONE,
+	SOURCE_ACCEL,
+};
+
 struct xwiimote_dev {
 	InputInfoPtr info;
 	void *handler;
@@ -79,6 +84,7 @@ struct xwiimote_dev {
 
 	XkbRMLVOSet rmlvo;
 	unsigned int motion;
+	unsigned int motion_source;
 	struct func map_key[XWII_KEY_NUM];
 };
 
@@ -303,11 +309,14 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
 	int32_t x, y;
+	int absolute;
 
-	if (dev->motion == MOTION_ABS) {
+	absolute = dev->motion;
+
+	if (dev->motion_source == SOURCE_ACCEL) {
 		x = ev->v.abs[0].x;
 		y = -1 * ev->v.abs[0].y;
-		xf86PostMotionEvent(dev->info->dev, Absolute, 0, 2, x, y);
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
 	}
 }
 
