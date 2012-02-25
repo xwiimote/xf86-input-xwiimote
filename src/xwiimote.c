@@ -99,6 +99,36 @@ static void xwiimote_rm_dev(struct xwiimote_dev *dev)
 	}
 }
 
+static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	Atom *atoms;
+	int num, ret = Success;
+	char btn1[] = BTN_LABEL_PROP_BTN_LEFT;
+	char btn2[] = BTN_LABEL_PROP_BTN_RIGHT;
+	char btn3[] = BTN_LABEL_PROP_BTN_MIDDLE;
+	unsigned char map[] = { 0 };
+
+	num = 3;
+	atoms = malloc(sizeof(*atoms) * num);
+	if (!atoms)
+		return BadAlloc;
+
+	memset(atoms, 0, sizeof(*atoms) * num);
+	atoms[0] = XIGetKnownProperty(btn1);
+	atoms[1] = XIGetKnownProperty(btn2);
+	atoms[2] = XIGetKnownProperty(btn3);
+
+	if (!InitButtonClassDeviceStruct(device, 1, atoms, map)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init button class\n");
+		ret = BadValue;
+		goto err_out;
+	}
+
+err_out:
+	free(atoms);
+	return ret;
+}
+
 static int xwiimote_prepare_abs(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	Atom *atoms;
@@ -141,6 +171,12 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot alloc interface\n");
 		return BadValue;
+	}
+
+	ret = xwiimote_prepare_btn(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
 	}
 
 	ret = xwiimote_prepare_abs(dev, device);
