@@ -36,7 +36,4 @@ AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS) -Wno-redundant-decls -Wno-cast-qual
 @DRIVER_NAME@_drv_la_LDFLAGS = -module -avoid-version
 @DRIVER_NAME@_drv_la_LIBADD = $(SYSDEP_LIBS)
 @DRIVER_NAME@_drv_ladir = @inputdir@
-
-@DRIVER_NAME@_drv_la_SOURCES = src/@DRIVER_NAME@.c \
-                               src/@DRIVER_NAME@.h
-
+@DRIVER_NAME@_drv_la_SOURCES = src/@DRIVER_NAME@.c
