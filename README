@@ -1,0 +1,19 @@
+        X.Org Wii Remote Input Driver
+
+This package includes an X.Org input driver for Nintendo Wii Remotes. It is
+based on the xwiimote packages available at http://github.com/dvdhrm/xwiimote.
+
+To install this driver use:
+	./configure --prefix=/usr
+	make
+	make install
+
+Please also copy the configuration file, otherwise the driver won't get loaded:
+	cp 60-xorg-xwiimote.conf /etc/X11/xorg.conf.d/
+
+Please see the man-page of the driver for further information.
+
+This driver was written by David Herrmann <dh.herrmann@googlemail.com>. For
+license information see ./COPYING. If you have questions please don't hesitate
+to contact me either per email or at:
+	http://github.com/dvdhrm/xf86-input-xwiimote
