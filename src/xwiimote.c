@@ -43,6 +43,7 @@ static char xwiimote_name[] = "xwiimote";
 
 struct xwiimote_dev {
 	InputInfoPtr info;
+	void *handler;
 	int dev_id;
 	char *root;
 	char *device;
@@ -114,6 +115,32 @@ static int xwiimote_close(struct xwiimote_dev *dev)
 	return Success;
 }
 
+static void xwiimote_input(int fd, pointer data)
+{
+	struct xwiimote_dev *dev = data;
+	InputInfoPtr info = dev->info;
+	struct xwii_event ev;
+	int ret;
+
+	dev = info->private;
+	if (dev->dup)
+		return;
+
+	do {
+		memset(&ev, 0, sizeof(ev));
+		ret = xwii_iface_read(dev->iface, &ev);
+		if (ret)
+			break;
+	} while (!ret);
+
+	if (ret != -EAGAIN) {
+		xf86IDrvMsg(info, X_INFO, "Device disconnected\n");
+		xf86RemoveInputHandler(dev->handler);
+		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
+		info->fd = -1;
+	}
+}
+
 static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
@@ -126,7 +153,12 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 	}
 
 	info->fd = xwii_iface_get_fd(dev->iface);
-	xf86AddEnabledDevice(info);
+	if (info->fd >= 0) {
+		dev->handler = xf86AddInputHandler(info->fd, xwiimote_input, dev);
+	} else {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get interface\n");
+	}
+
 	device->public.on = TRUE;
 
 	return Success;
@@ -139,7 +171,7 @@ static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 	device->public.on = FALSE;
 
 	if (info->fd >= 0) {
-		xf86RemoveEnabledDevice(info);
+		xf86RemoveInputHandler(dev->handler);
 		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
 		info->fd = -1;
 	}
@@ -168,32 +200,6 @@ static int xwiimote_control(DeviceIntPtr device, int what)
 			return xwiimote_close(dev);
 		default:
 			return BadValue;
-	}
-}
-
-static void xwiimote_input(InputInfoPtr info)
-{
-	struct xwiimote_dev *dev;
-	struct xwii_event ev;
-	int ret;
-
-	dev = info->private;
-	if (dev->dup)
-		return;
-
-	do {
-		memset(&ev, 0, sizeof(ev));
-		ret = xwii_iface_read(dev->iface, &ev);
-		if (ret)
-			break;
-		/* handle data in \ev */
-	} while (!ret);
-
-	if (ret != -EAGAIN) {
-		xf86IDrvMsg(info, X_INFO, "Device disconnected\n");
-		xf86RemoveEnabledDevice(info);
-		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
-		info->fd = -1;
 	}
 }
 
@@ -290,8 +296,9 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	dev->dev_id = -1;
 	info->private = dev;
 	info->device_control = xwiimote_control;
-	info->read_input = xwiimote_input;
+	info->read_input = NULL;
 	info->switch_mode = NULL;
+	info->fd = -1;
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
