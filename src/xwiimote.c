@@ -140,16 +140,20 @@ static void cp_opt(struct xwiimote_dev *dev, const char *name, char **out)
 
 static int xwiimote_prepare_key(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
-	cp_opt(dev, "XkbRules", &dev->rmlvo.rules);
-	if (!dev->rmlvo.rules) {
-		dev->rmlvo.rules = strdup("evdev");
-		if (!dev->rmlvo.rules)
-			return BadAlloc;
-	}
-
-	cp_opt(dev, "XkbModel", &dev->rmlvo.model);
-	cp_opt(dev, "XkbLayout", &dev->rmlvo.layout);
-	cp_opt(dev, "XkbVariant", &dev->rmlvo.variant);
+	cp_opt(dev, "xkb_rules", &dev->rmlvo.rules);
+	if (!dev->rmlvo.rules)
+		cp_opt(dev, "XkbRules", &dev->rmlvo.rules);
+	cp_opt(dev, "xkb_model", &dev->rmlvo.model);
+	if (!dev->rmlvo.model)
+		cp_opt(dev, "XkbModel", &dev->rmlvo.model);
+	cp_opt(dev, "xkb_layout", &dev->rmlvo.layout);
+	if (!dev->rmlvo.layout)
+		cp_opt(dev, "XkbLayout", &dev->rmlvo.layout);
+	cp_opt(dev, "xkb_variant", &dev->rmlvo.variant);
+	if (!dev->rmlvo.variant)
+		cp_opt(dev, "XkbVariant", &dev->rmlvo.variant);
+	cp_opt(dev, "xkb_options", &dev->rmlvo.options);
+	if (!dev->rmlvo.options)
 	cp_opt(dev, "XkbOptions", &dev->rmlvo.options);
 
 	if (!InitKeyboardDeviceStruct(device, &dev->rmlvo, NULL, NULL))
@@ -552,6 +556,13 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	xf86DeleteInput(info, flags);
 }
 
+static const char *xwiimote_defaults[] = {
+	"XkbRules", "evdev",
+	"XkbModel", "evdev",
+	"XkbLayout", "us",
+	NULL
+};
+
 _X_EXPORT InputDriverRec xwiimote_driver = {
 	1,
 	xwiimote_name,
@@ -559,7 +570,7 @@ _X_EXPORT InputDriverRec xwiimote_driver = {
 	xwiimote_preinit,
 	xwiimote_uninit,
 	NULL,
-	0,
+	(char**)xwiimote_defaults,
 };
 
 static pointer xwiimote_plug(pointer module,
