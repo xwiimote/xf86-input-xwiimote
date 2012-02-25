@@ -44,6 +44,8 @@
 #include <xserver-properties.h>
 #include <xwiimote.h>
 
+#define MIN_KEYCODE 8
+
 static char xwiimote_name[] = "xwiimote";
 
 enum func_type {
@@ -288,7 +290,7 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 								state, 0, 0);
 			break;
 		case FUNC_KEY:
-			key = dev->map_key[code].key;
+			key = dev->map_key[code].key + MIN_KEYCODE;
 			xf86PostKeyboardEvent(dev->info->dev, key, state);
 			break;
 		case FUNC_IGNORE:
