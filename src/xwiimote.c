@@ -37,6 +37,8 @@
 #include <xf86.h>
 #include <xf86Module.h>
 #include <xf86Xinput.h>
+#include <xkbsrv.h>
+#include <xkbstr.h>
 #include <xorg-server.h>
 #include <xorgVersion.h>
 #include <xserver-properties.h>
@@ -52,6 +54,8 @@ struct xwiimote_dev {
 	char *device;
 	bool dup;
 	struct xwii_iface *iface;
+
+	XkbRMLVOSet rmlvo;
 };
 
 /* List of all devices we know about to avoid duplicates */
@@ -97,6 +101,39 @@ static void xwiimote_rm_dev(struct xwiimote_dev *dev)
 		}
 		iter++;
 	}
+}
+
+static void cp_opt(struct xwiimote_dev *dev, const char *name, char **out)
+{
+	char *s;
+
+	s = xf86SetStrOption(dev->info->options, name, NULL);
+	if (!s || !s[0]) {
+		free(s);
+		*out = NULL;
+	} else {
+		*out = s;
+	}
+}
+
+static int xwiimote_prepare_key(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	cp_opt(dev, "XkbRules", &dev->rmlvo.rules);
+	if (!dev->rmlvo.rules) {
+		dev->rmlvo.rules = strdup("evdev");
+		if (!dev->rmlvo.rules)
+			return BadAlloc;
+	}
+
+	cp_opt(dev, "XkbModel", &dev->rmlvo.model);
+	cp_opt(dev, "XkbLayout", &dev->rmlvo.layout);
+	cp_opt(dev, "XkbVariant", &dev->rmlvo.variant);
+	cp_opt(dev, "XkbOptions", &dev->rmlvo.options);
+
+	if (!InitKeyboardDeviceStruct(device, &dev->rmlvo, NULL, NULL))
+		return BadValue;
+
+	return Success;
 }
 
 static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
@@ -171,6 +208,12 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot alloc interface\n");
 		return BadValue;
+	}
+
+	ret = xwiimote_prepare_key(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
 	}
 
 	ret = xwiimote_prepare_btn(dev, device);
@@ -437,6 +480,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	if (info->private) {
 		dev = info->private;
 		if (!dev->dup) {
+			XkbFreeRMLVOSet(&dev->rmlvo, FALSE);
 			xwiimote_rm_dev(dev);
 		}
 		free(dev->root);
