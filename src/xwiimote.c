@@ -295,6 +295,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	dev->info = info;
 	dev->dev_id = -1;
 	info->private = dev;
+	info->type_name = XI_MOUSE;
 	info->device_control = xwiimote_control;
 	info->read_input = NULL;
 	info->switch_mode = NULL;
