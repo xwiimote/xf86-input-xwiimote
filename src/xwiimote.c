@@ -189,20 +189,22 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	Atom *atoms;
 	int num, ret = Success;
+	char btn0[] = BTN_LABEL_PROP_BTN_UNKNOWN;
 	char btn1[] = BTN_LABEL_PROP_BTN_LEFT;
 	char btn2[] = BTN_LABEL_PROP_BTN_RIGHT;
 	char btn3[] = BTN_LABEL_PROP_BTN_MIDDLE;
-	unsigned char map[] = { 0 };
+	unsigned char map[] = { 0, 1, 2, 3 };
 
-	num = 3;
+	num = 4;
 	atoms = malloc(sizeof(*atoms) * num);
 	if (!atoms)
 		return BadAlloc;
 
 	memset(atoms, 0, sizeof(*atoms) * num);
-	atoms[0] = XIGetKnownProperty(btn1);
-	atoms[1] = XIGetKnownProperty(btn2);
-	atoms[2] = XIGetKnownProperty(btn3);
+	atoms[0] = XIGetKnownProperty(btn0);
+	atoms[1] = XIGetKnownProperty(btn1);
+	atoms[2] = XIGetKnownProperty(btn2);
+	atoms[3] = XIGetKnownProperty(btn3);
 
 	if (!InitButtonClassDeviceStruct(device, 1, atoms, map)) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init button class\n");
