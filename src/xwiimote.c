@@ -27,6 +27,7 @@
 #include "config.h"
 #endif
 
+#include <xorg-server.h>
 #include <errno.h>
 #include <exevents.h>
 #include <inttypes.h>
@@ -40,7 +41,6 @@
 #include <xf86Xinput.h>
 #include <xkbsrv.h>
 #include <xkbstr.h>
-#include <xorg-server.h>
 #include <xorgVersion.h>
 #include <xserver-properties.h>
 #include <xwiimote.h>
