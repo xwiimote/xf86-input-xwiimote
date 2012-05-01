@@ -60,21 +60,21 @@ struct func {
 	union {
 		int btn;
 		unsigned int key;
-	};
+	} u;
 };
 
 static struct func map_key_default[XWII_KEY_NUM] = {
-	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .key = KEY_LEFT },
-	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .key = KEY_RIGHT },
-	[XWII_KEY_UP] = { .type = FUNC_KEY, .key = KEY_UP },
-	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .key = KEY_DOWN },
-	[XWII_KEY_A] = { .type = FUNC_KEY, .key = KEY_ENTER },
-	[XWII_KEY_B] = { .type = FUNC_KEY, .key = KEY_SPACE },
-	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .key = KEY_VOLUMEUP },
-	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .key = KEY_VOLUMEDOWN },
-	[XWII_KEY_HOME] = { .type = FUNC_KEY, .key = KEY_ESC },
-	[XWII_KEY_ONE] = { .type = FUNC_KEY, .key = KEY_1 },
-	[XWII_KEY_TWO] = { .type = FUNC_KEY, .key = KEY_2 },
+	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
+	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
+	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
+	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
 };
 
 enum motion_type {
@@ -308,12 +308,12 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 
 	switch (dev->map_key[code].type) {
 		case FUNC_BTN:
-			btn = dev->map_key[code].btn;
+			btn = dev->map_key[code].u.btn;
 			xf86PostButtonEvent(dev->info->dev, absolute, btn,
 								state, 0, 0);
 			break;
 		case FUNC_KEY:
-			key = dev->map_key[code].key + MIN_KEYCODE;
+			key = dev->map_key[code].u.key + MIN_KEYCODE;
 			xf86PostKeyboardEvent(dev->info->dev, key, state);
 			break;
 		case FUNC_IGNORE:
@@ -1036,13 +1036,13 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 		out->type = FUNC_IGNORE;
 	} else if (!strcasecmp(key, "left-button")) {
 		out->type = FUNC_BTN;
-		out->btn = 1;
+		out->u.btn = 1;
 	} else if (!strcasecmp(key, "right-button")) {
 		out->type = FUNC_BTN;
-		out->btn = 2;
+		out->u.btn = 2;
 	} else if (!strcasecmp(key, "middle-button")) {
 		out->type = FUNC_BTN;
-		out->btn = 3;
+		out->u.btn = 3;
 	} else {
 		for (i = 0; key2value[i].key; ++i) {
 			if (!strcasecmp(key2value[i].key, key))
@@ -1051,7 +1051,7 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 
 		if (key2value[i].key) {
 			out->type = FUNC_KEY;
-			out->key = key2value[i].value;
+			out->u.key = key2value[i].value;
 		} else {
 			xf86IDrvMsg(dev->info, X_ERROR,
 						"Invalid key option %s\n", key);
