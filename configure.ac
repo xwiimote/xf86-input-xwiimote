@@ -37,6 +37,7 @@ AM_INIT_AUTOMAKE([dist-bzip2 -Wall -Werror 1.11 foreign no-dist-gzip tar-pax])
 AM_SILENT_RULES([yes])
 AM_CONFIG_HEADER([config.h])
 
+AM_PROG_AR
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_PROG_CC
