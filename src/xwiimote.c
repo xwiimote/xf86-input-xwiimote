@@ -93,7 +93,7 @@ struct xwiimote_dev {
 	void *handler;
 	int dev_id;
 	char *root;
-	char *device;
+	const char *device;
 	bool dup;
 	struct xwii_iface *iface;
 
@@ -1195,7 +1195,7 @@ _X_EXPORT InputDriverRec xwiimote_driver = {
 	xwiimote_preinit,
 	xwiimote_uninit,
 	NULL,
-	(char**)xwiimote_defaults,
+	xwiimote_defaults,
 };
 
 static pointer xwiimote_plug(pointer module,
