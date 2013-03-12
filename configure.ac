@@ -32,10 +32,10 @@ AC_INIT([xf86-input-xwiimote],
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_HEADER([config.h])
 
 AM_INIT_AUTOMAKE([dist-bzip2 -Wall -Werror 1.11 foreign no-dist-gzip tar-pax])
 AM_SILENT_RULES([yes])
-AM_CONFIG_HEADER([config.h])
 
 AM_PROG_AR
 AC_DISABLE_STATIC
