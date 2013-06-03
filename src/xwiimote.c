@@ -44,6 +44,7 @@
 #include <xorgVersion.h>
 #include <xserver-properties.h>
 #include <xwiimote.h>
+#include <unistd.h>
 
 #define MIN_KEYCODE 8
 
@@ -78,14 +79,15 @@ static struct func map_key_default[XWII_KEY_NUM] = {
 };
 
 enum motion_type {
-	MOTION_NONE,
-	MOTION_ABS,
 	MOTION_REL,
+	MOTION_ABS,
+//	MOTION_REL,
 };
 
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
+	SOURCE_MOTIONPLUS,
 };
 
 struct xwiimote_dev {
@@ -251,9 +253,47 @@ err_out:
 	return ret;
 }
 
+static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	Atom *atoms;
+	int i, num, ret = Success;
+	char relx[] = AXIS_LABEL_PROP_REL_X;
+	char rely[] = AXIS_LABEL_PROP_REL_Y;
+
+	num = 2;
+	atoms = malloc(sizeof(*atoms) * num);
+	if (!atoms)
+		return BadAlloc;
+
+	memset(atoms, 0, sizeof(*atoms) * num);
+	atoms[0] = XIGetKnownProperty(relx);
+	atoms[1] = XIGetKnownProperty(rely);
+
+	if (!InitValuatorClassDeviceStruct(device, num, atoms,
+					GetMotionHistorySize(), Relative)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init valuators\n");
+		ret = BadValue;
+		goto err_out;
+	}
+
+	for (i = 0; i < num; ++i) {
+		xf86InitValuatorAxisStruct(device, i, atoms[i],
+						-10000, 10000, 0, 0, 0, Relative);
+		xf86InitValuatorDefaults(device, i);
+	}
+
+err_out:
+	free(atoms);
+	return ret;
+}
+
 static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+	
+	//Quirk: Seems like MP-Device appears to late from kernel. We want it opened alongside the rest.
+	//TODO: listen to MP-appearance and then open its interface and add the inputhandlers and stuff...
+    sleep(2);
 
 	ret = xwii_iface_new(&dev->iface, dev->root);
 	if (ret) {
@@ -274,6 +314,12 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	}
 
 	ret = xwiimote_prepare_abs(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
+	}
+
+	ret = xwiimote_prepare_rel(dev, device);
 	if (ret != Success) {
 		xwii_iface_unref(dev->iface);
 		return ret;
@@ -337,6 +383,20 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	}
 }
 
+static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	int32_t x, y;
+	int absolute;
+
+	absolute = dev->motion;
+
+	if (dev->motion_source == SOURCE_MOTIONPLUS) {
+		x = ev->v.abs[0].x / 100;
+		y = -1 * ev->v.abs[0].z / 100;
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
+	}
+}
+
 static void xwiimote_input(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
@@ -361,6 +421,11 @@ static void xwiimote_input(int fd, pointer data)
 			case XWII_EVENT_ACCEL:
 				xwiimote_accel(dev, &ev);
 				break;
+			case XWII_EVENT_MOTION_PLUS:
+				xwiimote_motionplus(dev, &ev);
+				break;
+            default:
+                break;
 		}
 	} while (!ret);
 
@@ -375,13 +440,37 @@ static void xwiimote_input(int fd, pointer data)
 static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+	const char *normalize = NULL, *factor = NULL;
+	int x = 0, y = 0, z = 0, fac = 0;
 	InputInfoPtr info = device->public.devicePrivate;
 
-	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL);
+	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL | XWII_IFACE_MOTION_PLUS);
 	if (ret) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot open interface\n");
 		return BadValue;
 	}
+		
+	//TODO: make factor, x, y, z xinput-configurable properties.
+    factor = xf86FindOptionValue(dev->info->options, "MPCalibrationFactor");
+    if (!factor)
+	    factor = "";
+	if (strcasecmp(factor, "on") == 0 || strcasecmp(factor, "true") == 0)
+	    fac = 50;
+    else if (sscanf(factor, "%i", &fac) != 1)
+        fac = 0;
+        
+    normalize = xf86FindOptionValue(dev->info->options, "MPNormalize");
+    if (!normalize)
+	    normalize = "";
+    if (strcasecmp(normalize, "on") == 0 || strcasecmp(normalize, "true") == 0) {
+        //TODO: read from ~/.config/...
+        xwii_iface_mp_start_normalize(dev->iface, 0, 0, 0, fac);
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer started with (0,0,0) * %i\n", fac);
+    } else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
+        xwii_iface_mp_start_normalize(dev->iface, x*100, y*100, z*100, fac);
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer started with (%i.00:%i.00:%i.00) * %i\n", x,y,z, fac);
+    } else
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer not started\n");
 
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
@@ -397,6 +486,8 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+    //TODO: write mp_normalizer to XDG_CONFIG_DIR or ~/.config
+
 	InputInfoPtr info = device->public.devicePrivate;
 
 	device->public.on = FALSE;
@@ -475,7 +566,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	}
 
 	hid = udev_device_get_property_value(p, "HID_ID");
-	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
+	if (!hid || (strcmp(hid, "0005:0000057E:00000306") && strcmp(hid, "0005:0000057E:00000330"))) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
@@ -1039,10 +1130,10 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 		out->u.btn = 1;
 	} else if (!strcasecmp(key, "right-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 2;
+		out->u.btn = 3;
 	} else if (!strcasecmp(key, "middle-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 3;
+		out->u.btn = 2;
 	} else {
 		for (i = 0; key2value[i].key; ++i) {
 			if (!strcasecmp(key2value[i].key, key))
@@ -1073,6 +1164,9 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	if (!strcasecmp(motion, "accelerometer")) {
 		dev->motion = MOTION_ABS;
 		dev->motion_source = SOURCE_ACCEL;
+	} else if (!strcasecmp(motion, "motionplus")) {
+		dev->motion = MOTION_REL;
+		dev->motion_source = SOURCE_MOTIONPLUS;
 	}
 
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
