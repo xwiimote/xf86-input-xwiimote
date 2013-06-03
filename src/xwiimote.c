@@ -448,6 +448,8 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 		return BadValue;
 	}
 
+    xwii_iface_mp_start_normalize(dev->iface, 0, 0, 0, true);
+
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
 		dev->handler = xf86AddInputHandler(info->fd, xwiimote_input, dev);
