@@ -440,6 +440,8 @@ static void xwiimote_input(int fd, pointer data)
 static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+	const char *normalize = NULL, *factor = NULL;
+	int x = 0, y = 0, z = 0, fac = 0;
 	InputInfoPtr info = device->public.devicePrivate;
 
 	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL | XWII_IFACE_MOTION_PLUS);
@@ -447,8 +449,28 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot open interface\n");
 		return BadValue;
 	}
-
-    xwii_iface_mp_start_normalize(dev->iface, 0, 0, 0, true);
+		
+	//TODO: make factor, x, y, z xinput-configurable properties.
+    factor = xf86FindOptionValue(dev->info->options, "MPCalibrationFactor");
+    if (!factor)
+	    factor = "";
+	if (strcasecmp(factor, "on") == 0 || strcasecmp(factor, "true") == 0)
+	    fac = 50;
+    else if (sscanf(factor, "%i", &fac) != 1)
+        fac = 0;
+        
+    normalize = xf86FindOptionValue(dev->info->options, "MPNormalize");
+    if (!normalize)
+	    normalize = "";
+    if (strcasecmp(normalize, "on") == 0 || strcasecmp(normalize, "true") == 0) {
+        //TODO: read from ~/.config/...
+        xwii_iface_mp_start_normalize(dev->iface, 0, 0, 0, fac);
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer started with (0,0,0) * %i\n", fac);
+    } else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
+        xwii_iface_mp_start_normalize(dev->iface, x*100, y*100, z*100, fac);
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer started with (%i.00:%i.00:%i.00) * %i\n", x,y,z, fac);
+    } else
+		xf86IDrvMsg(dev->info, X_INFO, "MP_Normalizer not started\n");
 
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
@@ -464,6 +486,8 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+    //TODO: write mp_normalizer to XDG_CONFIG_DIR or ~/.config
+
 	InputInfoPtr info = device->public.devicePrivate;
 
 	device->public.on = FALSE;
