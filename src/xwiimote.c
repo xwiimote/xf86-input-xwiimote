@@ -475,7 +475,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	}
 
 	hid = udev_device_get_property_value(p, "HID_ID");
-	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
+	if (!hid || (strcmp(hid, "0005:0000057E:00000306") && strcmp(hid, "0005:0000057E:00000330"))) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
@@ -1039,10 +1039,10 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 		out->u.btn = 1;
 	} else if (!strcasecmp(key, "right-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 2;
+		out->u.btn = 3;
 	} else if (!strcasecmp(key, "middle-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 3;
+		out->u.btn = 2;
 	} else {
 		for (i = 0; key2value[i].key; ++i) {
 			if (!strcasecmp(key2value[i].key, key))
