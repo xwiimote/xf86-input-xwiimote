@@ -475,7 +475,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	}
 
 	hid = udev_device_get_property_value(p, "HID_ID");
-	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
+	if (!hid || (strcmp(hid, "0005:0000057E:00000306") && strcmp(hid, "0005:0000057E:00000330"))) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
