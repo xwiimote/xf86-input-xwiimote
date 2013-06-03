@@ -1039,10 +1039,10 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 		out->u.btn = 1;
 	} else if (!strcasecmp(key, "right-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 2;
+		out->u.btn = 3;
 	} else if (!strcasecmp(key, "middle-button")) {
 		out->type = FUNC_BTN;
-		out->u.btn = 3;
+		out->u.btn = 2;
 	} else {
 		for (i = 0; key2value[i].key; ++i) {
 			if (!strcasecmp(key2value[i].key, key))
