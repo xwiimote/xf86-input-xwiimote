@@ -44,6 +44,7 @@
 #include <xorgVersion.h>
 #include <xserver-properties.h>
 #include <xwiimote.h>
+#include <unistd.h>
 
 #define MIN_KEYCODE 8
 
@@ -78,14 +79,15 @@ static struct func map_key_default[XWII_KEY_NUM] = {
 };
 
 enum motion_type {
-	MOTION_NONE,
-	MOTION_ABS,
 	MOTION_REL,
+	MOTION_ABS,
+//	MOTION_REL,
 };
 
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
+	SOURCE_MOTIONPLUS,
 };
 
 struct xwiimote_dev {
@@ -251,9 +253,47 @@ err_out:
 	return ret;
 }
 
+static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	Atom *atoms;
+	int i, num, ret = Success;
+	char relx[] = AXIS_LABEL_PROP_REL_X;
+	char rely[] = AXIS_LABEL_PROP_REL_Y;
+
+	num = 2;
+	atoms = malloc(sizeof(*atoms) * num);
+	if (!atoms)
+		return BadAlloc;
+
+	memset(atoms, 0, sizeof(*atoms) * num);
+	atoms[0] = XIGetKnownProperty(relx);
+	atoms[1] = XIGetKnownProperty(rely);
+
+	if (!InitValuatorClassDeviceStruct(device, num, atoms,
+					GetMotionHistorySize(), Relative)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init valuators\n");
+		ret = BadValue;
+		goto err_out;
+	}
+
+	for (i = 0; i < num; ++i) {
+		xf86InitValuatorAxisStruct(device, i, atoms[i],
+						-10000, 10000, 0, 0, 0, Relative);
+		xf86InitValuatorDefaults(device, i);
+	}
+
+err_out:
+	free(atoms);
+	return ret;
+}
+
 static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+	
+	//Quirk: Seems like MP-Device appears to late from kernel. We want it opened alongside the rest.
+	//TODO: listen to MP-appearance and then open its interface and add the inputhandlers and stuff...
+    sleep(2);
 
 	ret = xwii_iface_new(&dev->iface, dev->root);
 	if (ret) {
@@ -274,6 +314,12 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	}
 
 	ret = xwiimote_prepare_abs(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
+	}
+
+	ret = xwiimote_prepare_rel(dev, device);
 	if (ret != Success) {
 		xwii_iface_unref(dev->iface);
 		return ret;
@@ -337,6 +383,20 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	}
 }
 
+static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	int32_t x, y;
+	int absolute;
+
+	absolute = dev->motion;
+
+	if (dev->motion_source == SOURCE_MOTIONPLUS) {
+		x = ev->v.abs[0].x / 100;
+		y = -1 * ev->v.abs[0].z / 100;
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
+	}
+}
+
 static void xwiimote_input(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
@@ -361,6 +421,11 @@ static void xwiimote_input(int fd, pointer data)
 			case XWII_EVENT_ACCEL:
 				xwiimote_accel(dev, &ev);
 				break;
+			case XWII_EVENT_MOTION_PLUS:
+				xwiimote_motionplus(dev, &ev);
+				break;
+            default:
+                break;
 		}
 	} while (!ret);
 
@@ -377,7 +442,7 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 	int ret;
 	InputInfoPtr info = device->public.devicePrivate;
 
-	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL);
+	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL | XWII_IFACE_MOTION_PLUS);
 	if (ret) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot open interface\n");
 		return BadValue;
@@ -1073,6 +1138,9 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	if (!strcasecmp(motion, "accelerometer")) {
 		dev->motion = MOTION_ABS;
 		dev->motion_source = SOURCE_ACCEL;
+	} else if (!strcasecmp(motion, "motionplus")) {
+		dev->motion = MOTION_REL;
+		dev->motion_source = SOURCE_MOTIONPLUS;
 	}
 
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
