@@ -445,7 +445,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	struct udev_device *d, *p;
 	struct stat st;
 	BOOL ret = TRUE;
-	const char *root, *snum, *hid;
+	const char *root, *snum, *driver, *subs;
 	int num;
 
 	udev = udev_new();
@@ -474,8 +474,10 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 		goto err_dev;
 	}
 
-	hid = udev_device_get_property_value(p, "HID_ID");
-	if (!hid || strcmp(hid, "0005:0000057E:00000306")) {
+	driver = udev_device_get_driver(p);
+	subs = udev_device_get_subsystem(p);
+	if (!driver || strcmp(driver, "wiimote") ||
+	    !subs || strcmp(subs, "hid")) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
