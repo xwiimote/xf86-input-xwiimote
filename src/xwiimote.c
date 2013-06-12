@@ -255,12 +255,6 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
 
-	ret = xwii_iface_new(&dev->iface, dev->root);
-	if (ret) {
-		xf86IDrvMsg(dev->info, X_ERROR, "Cannot alloc interface\n");
-		return BadValue;
-	}
-
 	ret = xwiimote_prepare_key(dev, device);
 	if (ret != Success) {
 		xwii_iface_unref(dev->iface);
@@ -284,7 +278,6 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
-	xwii_iface_unref(dev->iface);
 	return Success;
 }
 
@@ -1151,6 +1144,13 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 	xf86IDrvMsg(dev->info, X_INFO, "Is a core device\n");
 
+	ret = xwii_iface_new(&dev->iface, dev->root);
+	if (ret) {
+		xf86IDrvMsg(info, X_ERROR, "Cannot alloc interface\n");
+		ret = BadValue;
+		goto err_free;
+	}
+
 	xwiimote_add_dev(dev);
 	xwiimote_configure(dev);
 
@@ -1174,6 +1174,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		if (!dev->dup) {
 			XkbFreeRMLVOSet(&dev->rmlvo, FALSE);
 			xwiimote_rm_dev(dev);
+			xwii_iface_unref(dev->iface);
 		}
 		free(dev->root);
 		free(dev);
