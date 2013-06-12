@@ -251,6 +251,41 @@ err_out:
 	return ret;
 }
 
+static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device)
+{
+	Atom *atoms;
+	int i, num, ret = Success;
+	char relx[] = AXIS_LABEL_PROP_REL_X;
+	char rely[] = AXIS_LABEL_PROP_REL_Y;
+
+	num = 2;
+	atoms = malloc(sizeof(*atoms) * num);
+	if (!atoms)
+		return BadAlloc;
+
+	memset(atoms, 0, sizeof(*atoms) * num);
+	atoms[0] = XIGetKnownProperty(relx);
+	atoms[1] = XIGetKnownProperty(rely);
+
+	if (!InitValuatorClassDeviceStruct(device, num, atoms,
+					   GetMotionHistorySize(),
+					   Relative)) {
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init valuators\n");
+		ret = BadValue;
+		goto err_out;
+	}
+
+	for (i = 0; i < num; ++i) {
+		xf86InitValuatorAxisStruct(device, i, atoms[i],
+					   -10000, 10000, 0, 0, 0, Relative);
+		xf86InitValuatorDefaults(device, i);
+	}
+
+err_out:
+	free(atoms);
+	return ret;
+}
+
 static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
@@ -268,6 +303,12 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	}
 
 	ret = xwiimote_prepare_abs(dev, device);
+	if (ret != Success) {
+		xwii_iface_unref(dev->iface);
+		return ret;
+	}
+
+	ret = xwiimote_prepare_rel(dev, device);
 	if (ret != Success) {
 		xwii_iface_unref(dev->iface);
 		return ret;
