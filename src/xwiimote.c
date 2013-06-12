@@ -96,6 +96,7 @@ struct xwiimote_dev {
 	const char *device;
 	bool dup;
 	struct xwii_iface *iface;
+	unsigned int ifs;
 
 	XkbRMLVOSet rmlvo;
 	unsigned int motion;
@@ -363,6 +364,15 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	}
 }
 
+static void xwiimote_refresh(struct xwiimote_dev *dev)
+{
+	int ret;
+
+	ret = xwii_iface_open(dev->iface, dev->ifs);
+	if (ret)
+		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
+}
+
 static void xwiimote_input(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
@@ -381,6 +391,9 @@ static void xwiimote_input(int fd, pointer data)
 			break;
 
 		switch (ev.type) {
+			case XWII_EVENT_WATCH:
+				xwiimote_refresh(dev);
+				break;
 			case XWII_EVENT_KEY:
 				xwiimote_key(dev, &ev);
 				break;
@@ -403,17 +416,19 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 	int ret;
 	InputInfoPtr info = device->public.devicePrivate;
 
-	ret = xwii_iface_open(dev->iface, XWII_IFACE_CORE | XWII_IFACE_ACCEL);
-	if (ret) {
-		xf86IDrvMsg(dev->info, X_ERROR, "Cannot open interface\n");
-		return BadValue;
-	}
+	ret = xwii_iface_open(dev->iface, dev->ifs);
+	if (ret)
+		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
+
+	ret = xwii_iface_watch(dev->iface, true);
+	if (ret)
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot watch device for hotplug events\n");
 
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
 		dev->handler = xf86AddInputHandler(info->fd, xwiimote_input, dev);
 	} else {
-		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get interface\n");
+		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get interface fd\n");
 	}
 
 	device->public.on = TRUE;
@@ -429,6 +444,7 @@ static int xwiimote_off(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 	if (info->fd >= 0) {
 		xf86RemoveInputHandler(dev->handler);
+		xwii_iface_watch(dev->iface, false);
 		xwii_iface_close(dev->iface, XWII_IFACE_ALL);
 		info->fd = -1;
 	}
@@ -1101,6 +1117,7 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	if (!strcasecmp(motion, "accelerometer")) {
 		dev->motion = MOTION_ABS;
 		dev->motion_source = SOURCE_ACCEL;
+		dev->ifs |= XWII_IFACE_ACCEL;
 	}
 
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
@@ -1177,6 +1194,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 	xf86IDrvMsg(dev->info, X_INFO, "Is a core device\n");
 
+	dev->ifs = XWII_IFACE_CORE;
 	ret = xwii_iface_new(&dev->iface, dev->root);
 	if (ret) {
 		xf86IDrvMsg(info, X_ERROR, "Cannot alloc interface\n");
