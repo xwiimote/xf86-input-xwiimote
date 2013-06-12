@@ -291,28 +291,20 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	int ret;
 
 	ret = xwiimote_prepare_key(dev, device);
-	if (ret != Success) {
-		xwii_iface_unref(dev->iface);
+	if (ret != Success)
 		return ret;
-	}
 
 	ret = xwiimote_prepare_btn(dev, device);
-	if (ret != Success) {
-		xwii_iface_unref(dev->iface);
+	if (ret != Success)
 		return ret;
-	}
 
 	ret = xwiimote_prepare_abs(dev, device);
-	if (ret != Success) {
-		xwii_iface_unref(dev->iface);
+	if (ret != Success)
 		return ret;
-	}
 
 	ret = xwiimote_prepare_rel(dev, device);
-	if (ret != Success) {
-		xwii_iface_unref(dev->iface);
+	if (ret != Success)
 		return ret;
-	}
 
 	return Success;
 }
