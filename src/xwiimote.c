@@ -328,7 +328,7 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	int32_t x, y;
 	int absolute;
 
-	absolute = dev->motion;
+	absolute = dev->motion == MOTION_ABS;
 
 	if (dev->motion_source == SOURCE_ACCEL) {
 		x = ev->v.abs[0].x;
