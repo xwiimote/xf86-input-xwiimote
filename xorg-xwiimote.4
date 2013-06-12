@@ -14,6 +14,10 @@ xf86-input-xwiimote \- X.Org Nintendo Wii Remote Input Driver
 \ \ ...
 .BI "  Option \*qDevice\*q        \*q" devpath \*q
 .BI "  Option \*qMotionSource\*q  \*q" source \*q
+\ \ ...
+.BI "  Option \*qMPNormalization\*q \*q" Int:Int:Int \*q
+.BI "  Option \*qMPCalibrationFactor\*q \*q" Int \*q
+\ \ ...
 .BI "  Option \*qMapLeft\*q       \*q" val \*q
 .BI "  Option \*qMapRight\*q      \*q" val \*q
 .BI "  Option \*qMapUp\*q         \*q" val \*q
@@ -76,12 +80,36 @@ want to disable device hot-plug.
 .IP "\fBOption \*qMotionSource\*q \fP\*qsource\*q"
 The Wii Remote can be used as motion input device (like a mouse). This selects
 what kind of motion-emulation should be performed. \fBsource\fP can be one of
-\fBaccelerometer\fP or \fBoff\fP. Default is \fBoff\fP which means no
-motion-emulation is done. \fBaccelerometer\fP means that the accelerometer is
-used to calculate current tilt and use this as absolute pointer input. This is
-still
+\fBaccelerometer\fP, \fBMotionPlus\fP or \fBoff\fP. Default is \fBoff\fP which
+means no motion-emulation is done. \fBaccelerometer\fP means that the
+accelerometer is used to calculate current tilt and use this as absolute
+pointer input. This is still
 .B experimental
 and should not be used!
+
+\fBMotionPlus\fP means that the gyroscope of MotionPlus extensions (or Gen2.0
+Devices with built-in MotionPlus) is used. You need to set \fBMPNormalization\fP
+and \fBMPCalibrationFactor\fP or use run-time calibration to make use of this.
+This does nothing if no MotionPlus is detected. With newer kernels, you can
+plug/replug the MotionPlus adapter during runtime and it gets detected
+automatically.
+
+.PP
+.IR "\fBOption \*qMPNormalization\*q \fP" "\*qOn\*q or \*qInt:Int:Int\*q"
+.br
+.IR "\fBOption \*qMPCalibrationFactor\*q \fP" "\*qOn\*q or \*qInt\*q"
+.RS
+If running in MotionSource MotionPlus configuration, MPNormalization can be
+used to apply a constant offset to normalize MotionPlus data. Please use
+\fBxwiishow\fP or some similar tool from the \fBxwiimote\fP distribution to
+get these offsets. Note that these offsets are multiplied by 100 internally.
+Set this to \fBon\fP to let the driver perform automatic normalization during
+startup.
+
+The calibration factor is used to apply calibration values during runtime to
+keep the data smooth. A factor between 10 and 100 is normally used. If set to
+\fBon\fP, 50 will be used.
+.RE
 
 .PP
 The following options specify keymaps for the buttons of a Wii Remote. The

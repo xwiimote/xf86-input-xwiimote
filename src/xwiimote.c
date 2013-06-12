@@ -86,6 +86,7 @@ enum motion_type {
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
+	SOURCE_MOTIONPLUS,
 };
 
 struct xwiimote_dev {
@@ -364,6 +365,20 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	}
 }
 
+static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	int32_t x, y;
+	int absolute;
+
+	absolute = dev->motion == MOTION_ABS;
+
+	if (dev->motion_source == SOURCE_MOTIONPLUS) {
+		x = ev->v.abs[0].x / 100;
+		y = -1 * ev->v.abs[0].z / 100;
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
+	}
+}
+
 static void xwiimote_refresh(struct xwiimote_dev *dev)
 {
 	int ret;
@@ -399,6 +414,9 @@ static void xwiimote_input(int fd, pointer data)
 				break;
 			case XWII_EVENT_ACCEL:
 				xwiimote_accel(dev, &ev);
+				break;
+			case XWII_EVENT_MOTION_PLUS:
+				xwiimote_motionplus(dev, &ev);
 				break;
 		}
 	} while (!ret);
@@ -1104,6 +1122,47 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 	}
 }
 
+static void xwiimote_configure_mp(struct xwiimote_dev *dev)
+{
+	const char *normalize, *factor;
+	int x, y, z, fac;
+
+	/* TODO: Allow modifying x, y, z and factor via xinput-properties for
+	 * run-time calibration. */
+
+	factor = xf86FindOptionValue(dev->info->options, "MPCalibrationFactor");
+	if (!factor)
+		factor = "";
+
+	if (!strcasecmp(factor, "on") ||
+	    !strcasecmp(factor, "true") ||
+	    !strcasecmp(factor, "yes"))
+		fac = 50;
+	else if (sscanf(factor, "%i", &fac) != 1)
+		fac = 0;
+
+	normalize = xf86FindOptionValue(dev->info->options, "MPNormalization");
+	if (!normalize)
+		normalize = "";
+
+	if (!strcasecmp(normalize, "on") ||
+	    !strcasecmp(normalize, "true") ||
+	    !strcasecmp(normalize, "yes")) {
+		xwii_iface_set_mp_normalization(dev->iface, 0, 0, 0, fac);
+		xf86IDrvMsg(dev->info, X_INFO,
+			    "MP-Normalizer started with (0:0:0) * %i\n", fac);
+	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
+		xwii_iface_set_mp_normalization(dev->iface,
+						x * 100,
+						y * 100,
+						z * 100,
+						fac);
+		xf86IDrvMsg(dev->info, X_INFO,
+			    "MP-Normalizer started with (%i:%i:%i) * %i\n",
+			    x, y, z, fac);
+	}
+}
+
 static void xwiimote_configure(struct xwiimote_dev *dev)
 {
 	const char *motion, *key;
@@ -1118,6 +1177,10 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 		dev->motion = MOTION_ABS;
 		dev->motion_source = SOURCE_ACCEL;
 		dev->ifs |= XWII_IFACE_ACCEL;
+	} else if (!strcasecmp(motion, "motionplus")) {
+		dev->motion = MOTION_REL;
+		dev->motion_source = SOURCE_MOTIONPLUS;
+		dev->ifs |= XWII_IFACE_MOTION_PLUS;
 	}
 
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
@@ -1152,6 +1215,8 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 
 	key = xf86FindOptionValue(dev->info->options, "MapTwo");
 	parse_key(dev, key, &dev->map_key[XWII_KEY_TWO]);
+
+	xwiimote_configure_mp(dev);
 }
 
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
