@@ -401,7 +401,7 @@ static void xwiimote_input(int fd, pointer data)
 
 	do {
 		memset(&ev, 0, sizeof(ev));
-		ret = xwii_iface_poll(dev->iface, &ev);
+		ret = xwii_iface_dispatch(dev->iface, &ev, sizeof(ev));
 		if (ret)
 			break;
 
