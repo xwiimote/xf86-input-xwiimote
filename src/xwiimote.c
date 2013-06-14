@@ -1152,11 +1152,7 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 		xf86IDrvMsg(dev->info, X_INFO,
 			    "MP-Normalizer started with (0:0:0) * %i\n", fac);
 	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
-		xwii_iface_set_mp_normalization(dev->iface,
-						x * 100,
-						y * 100,
-						z * 100,
-						fac);
+		xwii_iface_set_mp_normalization(dev->iface, x, y, z, fac);
 		xf86IDrvMsg(dev->info, X_INFO,
 			    "MP-Normalizer started with (%i:%i:%i) * %i\n",
 			    x, y, z, fac);
