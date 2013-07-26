@@ -4,7 +4,7 @@ This package includes an X.Org input driver for Nintendo Wii Remotes. It is
 based on the xwiimote packages available at http://github.com/dvdhrm/xwiimote.
 
 To install this driver use:
-	./configure --prefix=/usr
+	./autogen.sh --prefix=/usr
 	make
 	make install
 
