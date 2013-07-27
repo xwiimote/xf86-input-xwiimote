@@ -56,7 +56,7 @@ AC_ARG_WITH(xorg-module-dir,
 inputdir=${moduledir}/input
 AC_SUBST(inputdir)
 
-PKG_CHECK_MODULES(SYSDEP, libudev libxwiimote)
+PKG_CHECK_MODULES(SYSDEP, libudev libxwiimote >= 2)
 AC_SUBST(SYSDEP_CFLAGS)
 AC_SUBST(SYSDEP_LIBS)
 
