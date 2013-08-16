@@ -47,6 +47,9 @@
 
 #define MIN_KEYCODE 8
 
+#define XWIIMOTE_ACCEL_HISTORY_NUM 12
+#define XWIIMOTE_ACCEL_HISTORY_MOD 2
+
 static char xwiimote_name[] = "xwiimote";
 
 enum func_type {
@@ -103,6 +106,9 @@ struct xwiimote_dev {
 	unsigned int motion;
 	unsigned int motion_source;
 	struct func map_key[XWII_KEY_NUM];
+
+	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
+	int accel_history_cur;
 };
 
 /* List of all devices we know about to avoid duplicates */
@@ -359,16 +365,34 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 
 static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
-	int32_t x, y;
-	int absolute;
+	int32_t x, y, r;
+	int absolute, i;
+
+	if (dev->motion_source != SOURCE_ACCEL)
+		return;
+
+	++dev->accel_history_cur;
+	dev->accel_history_cur %= XWIIMOTE_ACCEL_HISTORY_NUM;
+	dev->accel_history_ev[dev->accel_history_cur] = ev->v.abs[0];
+
+	/* choose the smallest one */
+	x = dev->accel_history_ev[0].x;
+	y = dev->accel_history_ev[0].y;
+	for (i = 1; i < XWIIMOTE_ACCEL_HISTORY_NUM; i++) {
+		if (dev->accel_history_ev[i].x < x)
+			x = dev->accel_history_ev[i].x;
+		if (dev->accel_history_ev[i].y < y)
+			y = dev->accel_history_ev[i].y;
+	}
+
+	/* limit values to make it more stable */
+	r = x % XWIIMOTE_ACCEL_HISTORY_MOD;
+	x -= r;
+	r = y % XWIIMOTE_ACCEL_HISTORY_MOD;
+	y -= r;
 
 	absolute = dev->motion == MOTION_ABS;
-
-	if (dev->motion_source == SOURCE_ACCEL) {
-		x = ev->v.abs[0].x;
-		y = -1 * ev->v.abs[0].y;
-		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
-	}
+	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
 }
 
 static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
