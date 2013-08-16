@@ -220,10 +220,10 @@ err_out:
 	return ret;
 }
 
-static int xwiimote_prepare_abs(struct xwiimote_dev *dev, DeviceIntPtr device)
+static int xwiimote_prepare_abs(struct xwiimote_dev *dev, DeviceIntPtr device, int xmin, int xmax, int ymin, int ymax)
 {
 	Atom *atoms;
-	int i, num, ret = Success;
+	int num, ret = Success;
 	char absx[] = AXIS_LABEL_PROP_ABS_X;
 	char absy[] = AXIS_LABEL_PROP_ABS_Y;
 
@@ -243,21 +243,20 @@ static int xwiimote_prepare_abs(struct xwiimote_dev *dev, DeviceIntPtr device)
 		goto err_out;
 	}
 
-	for (i = 0; i < num; ++i) {
-		xf86InitValuatorAxisStruct(device, i, atoms[i],
-						-100, 100, 0, 0, 0, Absolute);
-		xf86InitValuatorDefaults(device, i);
-	}
+	xf86InitValuatorAxisStruct(device, 0, atoms[0], xmin, xmax, 0, 0, 0, Absolute);
+	xf86InitValuatorDefaults(device, 0);
+	xf86InitValuatorAxisStruct(device, 1, atoms[1], ymin, ymax, 0, 0, 0, Absolute);
+	xf86InitValuatorDefaults(device, 1);
 
 err_out:
 	free(atoms);
 	return ret;
 }
 
-static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device)
+static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device, int xmin, int xmax, int ymin, int ymax)
 {
 	Atom *atoms;
-	int i, num, ret = Success;
+	int num, ret = Success;
 	char relx[] = AXIS_LABEL_PROP_REL_X;
 	char rely[] = AXIS_LABEL_PROP_REL_Y;
 
@@ -278,11 +277,10 @@ static int xwiimote_prepare_rel(struct xwiimote_dev *dev, DeviceIntPtr device)
 		goto err_out;
 	}
 
-	for (i = 0; i < num; ++i) {
-		xf86InitValuatorAxisStruct(device, i, atoms[i],
-					   -10000, 10000, 0, 0, 0, Relative);
-		xf86InitValuatorDefaults(device, i);
-	}
+	xf86InitValuatorAxisStruct(device, 0, atoms[0], xmin, xmax, 0, 0, 0, Relative);
+	xf86InitValuatorDefaults(device, 0);
+	xf86InitValuatorAxisStruct(device, 1, atoms[1], ymin, ymax, 0, 0, 0, Relative);
+	xf86InitValuatorDefaults(device, 1);
 
 err_out:
 	free(atoms);
@@ -301,11 +299,18 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret != Success)
 		return ret;
 
-	ret = xwiimote_prepare_abs(dev, device);
-	if (ret != Success)
-		return ret;
+	switch(dev->motion_source) {
+	case SOURCE_ACCEL:
+		ret = xwiimote_prepare_abs(dev, device, -100, 100, -100, 100);
+		break;
+	case SOURCE_MOTIONPLUS:
+		ret = xwiimote_prepare_rel(dev, device, -10000, 10000, -10000, 10000);
+		break;
+	default:
+		ret = Success;
+		break;
+	}
 
-	ret = xwiimote_prepare_rel(dev, device);
 	if (ret != Success)
 		return ret;
 
