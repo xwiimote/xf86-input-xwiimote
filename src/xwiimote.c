@@ -106,7 +106,7 @@ struct xwiimote_dev {
 };
 
 /* List of all devices we know about to avoid duplicates */
-static struct xwiimote_dev *xwiimote_devices[MAXDEVICES] = { NULL };
+static struct xwiimote_dev *xwiimote_devices[MAXDEVICES + 1];
 
 static BOOL xwiimote_is_dev(struct xwiimote_dev *dev)
 {
@@ -141,9 +141,10 @@ static void xwiimote_rm_dev(struct xwiimote_dev *dev)
 	while (*iter) {
 		++num;
 		if (*iter == dev) {
+			/* last device is always NULL so no need to clear it */
 			memmove(iter, iter + 1,
 					sizeof(xwiimote_devices) -
-					(num * sizeof(*dev)));
+					(num * sizeof(*iter)));
 			break;
 		}
 		iter++;
