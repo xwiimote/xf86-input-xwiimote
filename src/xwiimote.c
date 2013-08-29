@@ -404,7 +404,7 @@ static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
 
 	if (dev->motion_source == SOURCE_MOTIONPLUS) {
 		x = ev->v.abs[0].x / 100;
-		y = -1 * ev->v.abs[0].z / 100;
+		y = ev->v.abs[0].z / 100;
 		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
 	}
 }
