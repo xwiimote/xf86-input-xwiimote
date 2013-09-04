@@ -13,7 +13,14 @@ Please also copy the configuration file, otherwise the driver won't get loaded:
 
 Please see the man-page of the driver for further information.
 
-This driver was written by David Herrmann <dh.herrmann@googlemail.com>. For
-license information see ./COPYING. If you have questions please don't hesitate
-to contact me either per email or at:
-	http://github.com/dvdhrm/xf86-input-xwiimote
+This driver was written by (ordered by commit-dates):
+	David Herrmann <dh.herrmann@gmail.com>
+	Matthew Monaco
+	Andreas Fuchs <anduchs@gmail.com>
+	John Koelndorfer <jkoelndorfer@gmail.com>
+	Nicolas Adenis-Lamarre <nicolas.adenis.lamarre@gmail.com>
+
+For license information see ./COPYING. If you have questions please don't
+hesitate to contact one of the maintainers either per email or on github:
+	- David Herrmann <dh.herrmann@gmail.com>
+	- http://github.com/dvdhrm/xf86-input-xwiimote
