@@ -80,12 +80,16 @@ want to disable device hot-plug.
 .IP "\fBOption \*qMotionSource\*q \fP\*qsource\*q"
 The Wii Remote can be used as motion input device (like a mouse). This selects
 what kind of motion-emulation should be performed. \fBsource\fP can be one of
-\fBaccelerometer\fP, \fBMotionPlus\fP or \fBoff\fP. Default is \fBoff\fP which
-means no motion-emulation is done. \fBaccelerometer\fP means that the
-accelerometer is used to calculate current tilt and use this as absolute
-pointer input. This is still
-.B experimental
-and should not be used!
+\fBaccelerometer\fP, \fBir\fP, \fBMotionPlus\fP or \fBoff\fP. Default is
+\fBoff\fP which means no motion-emulation is done. \fBaccelerometer\fP means
+that the accelerometer is used to calculate current tilt and use this as
+absolute pointer input.
+
+\fBir\fP means that the IR sensor is used to detect the mouse-location. You need
+to place an IR emitter in front of you. The Wii Remote has a built-in camera to
+scan it and calculate the pointer-position from it. Only a single IR source is
+used by this driver. If multiple IR sources are found, the upper-left most is
+used.
 
 \fBMotionPlus\fP means that the gyroscope of MotionPlus extensions (or Gen2.0
 Devices with built-in MotionPlus) is used. You need to set \fBMPNormalization\fP

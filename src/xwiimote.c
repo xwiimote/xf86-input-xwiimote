@@ -89,6 +89,7 @@ enum motion_type {
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
+	SOURCE_IR,
 	SOURCE_MOTIONPLUS,
 };
 
@@ -312,6 +313,9 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	case SOURCE_MOTIONPLUS:
 		ret = xwiimote_prepare_rel(dev, device, -10000, 10000, -10000, 10000);
 		break;
+	case SOURCE_IR:
+		ret = xwiimote_prepare_abs(dev, device, 0, 1023, 0, 767);
+		break;
 	default:
 		ret = Success;
 		break;
@@ -395,6 +399,43 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
 }
 
+static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	const struct xwii_event_abs *e, *best;
+	int absolute, i;
+
+	absolute = dev->motion == MOTION_ABS;
+
+	if (dev->motion_source != SOURCE_IR)
+		return;
+
+	/*
+	 * For the xf86 driver, we cannot base IR on the middle of the
+	 * sensor bar. We wouldn't be able to reach extremity values.
+	 * Instead just use the most left (then most upper) point we find.
+	 */
+
+	best = NULL;
+
+	for (i = 0; i < 4; ++i) {
+		e = &ev->v.abs[i];
+
+		if (!xwii_event_ir_is_valid(e))
+			continue;
+
+		if (!best)
+			best = e;
+		else if (e->x < best->x)
+			best = e;
+		else if (e->x == best->x && e->y < best->y)
+			best = e;
+	}
+
+	if (best)
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
+				    1023 - best->x, best->y);
+}
+
 static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
 	int32_t x, y;
@@ -445,6 +486,8 @@ static void xwiimote_input(int fd, pointer data)
 			case XWII_EVENT_ACCEL:
 				xwiimote_accel(dev, &ev);
 				break;
+			case XWII_EVENT_IR:
+				xwiimote_ir(dev, &ev);
 			case XWII_EVENT_MOTION_PLUS:
 				xwiimote_motionplus(dev, &ev);
 				break;
@@ -1203,6 +1246,10 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 		dev->motion = MOTION_ABS;
 		dev->motion_source = SOURCE_ACCEL;
 		dev->ifs |= XWII_IFACE_ACCEL;
+	} else if (!strcasecmp(motion, "ir")) {
+		dev->motion = MOTION_ABS;
+		dev->motion_source = SOURCE_IR;
+		dev->ifs |= XWII_IFACE_IR;
 	} else if (!strcasecmp(motion, "motionplus")) {
 		dev->motion = MOTION_REL;
 		dev->motion_source = SOURCE_MOTIONPLUS;
