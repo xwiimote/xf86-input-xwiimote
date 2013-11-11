@@ -17,6 +17,8 @@ xf86-input-xwiimote \- X.Org Nintendo Wii Remote Input Driver
 \ \ ...
 .BI "  Option \*qMPNormalization\*q \*q" Int:Int:Int \*q
 .BI "  Option \*qMPCalibrationFactor\*q \*q" Int \*q
+.BI "  Option \*qMPXAxis\*q       " "\*qx\*q or \*qy\*q or \*qz\*q"
+.BI "  Option \*qMPXScale\*q      \*q" Int \*q
 \ \ ...
 .BI "  Option \*qMapLeft\*q       \*q" val \*q
 .BI "  Option \*qMapRight\*q      \*q" val \*q
@@ -102,6 +104,18 @@ automatically.
 .IR "\fBOption \*qMPNormalization\*q \fP" "\*qOn\*q or \*qInt:Int:Int\*q"
 .br
 .IR "\fBOption \*qMPCalibrationFactor\*q \fP" "\*qOn\*q or \*qInt\*q"
+.br
+.IR "\fBOption \*qMPXAxis\*q \fP" "\*qx\*q or \*qy\*q or \*qz\*q"
+.br
+.IR "\fBOption \*qMPXScale\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qMPYAxis\*q \fP" "\*qx\*q or \*qy\*q or \*qz\*q"
+.br
+.IR "\fBOption \*qMPYScale\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qMPZAxis\*q \fP" "\*qx\*q or \*qy\*q or \*qz\*q"
+.br
+.IR "\fBOption \*qMPZScale\*q \fP" "\*qInt\*q"
 .RS
 If running in MotionSource MotionPlus configuration, MPNormalization can be
 used to apply a constant offset to normalize MotionPlus data. Please use
@@ -113,6 +127,14 @@ startup.
 The calibration factor is used to apply calibration values during runtime to
 keep the data smooth. A factor between 10 and 100 is normally used. If set to
 \fBon\fP, 50 will be used.
+
+The \fBAxis\fP and \fBScale\fP options for each axis define remappings and
+scaling in case the default mappings are not what you want. The Axis selector
+specifies which axis to use as source. So if you set MPXAxis to \fBz\fP, then
+whenever the driver wants to read the X-axis values, it gets the Z-axis instead.
+The Scale options specify a multiplier. The default is 1 (no scaling). The
+default for the axis-mappings are the trivial mappings. Note that the
+MP-motion-source only uses X and Z axis for movement calculations.
 .RE
 
 .PP

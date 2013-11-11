@@ -107,6 +107,12 @@ struct xwiimote_dev {
 	unsigned int motion;
 	unsigned int motion_source;
 	struct func map_key[XWII_KEY_NUM];
+	unsigned int mp_x;
+	unsigned int mp_y;
+	unsigned int mp_z;
+	int mp_x_scale;
+	int mp_y_scale;
+	int mp_z_scale;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -436,17 +442,47 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 				    1023 - best->x, best->y);
 }
 
+static int32_t get_mp_axis(struct xwiimote_dev *dev,
+			   struct xwii_event *ev,
+			   unsigned int axis)
+{
+	switch (axis) {
+	case 0:
+		axis = dev->mp_x;
+		break;
+	case 1:
+		axis = dev->mp_y;
+		break;
+	case 2:
+		axis = dev->mp_z;
+		break;
+	default:
+		return 0;
+	}
+
+	switch (axis) {
+	case 0:
+		return ev->v.abs[0].x * dev->mp_x_scale;
+	case 1:
+		return ev->v.abs[0].y * dev->mp_y_scale;
+	case 2:
+		return ev->v.abs[0].z * dev->mp_z_scale;
+	default:
+		return 0;
+	}
+}
+
 static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
-	int32_t x, y;
+	int32_t x, z;
 	int absolute;
 
 	absolute = dev->motion == MOTION_ABS;
 
 	if (dev->motion_source == SOURCE_MOTIONPLUS) {
-		x = ev->v.abs[0].x / 100;
-		y = ev->v.abs[0].z / 100;
-		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
+		x = get_mp_axis(dev, ev, 0) / 100;
+		z = get_mp_axis(dev, ev, 2) / 100;
+		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, z);
 	}
 }
 
@@ -1195,9 +1231,31 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 	}
 }
 
+static void parse_axis(struct xwiimote_dev *dev, const char *t,
+		       unsigned int *out, unsigned int def)
+{
+	if (!t)
+		return;
+
+	if (!strcasecmp(t, "x"))
+		*out = 0;
+	else if (!strcasecmp(t, "y"))
+		*out = 1;
+	else if (!strcasecmp(t, "z"))
+		*out = 2;
+}
+
+static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
+{
+	if (!t)
+		return;
+
+	*out = atoi(t);
+}
+
 static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 {
-	const char *normalize, *factor;
+	const char *normalize, *factor, *t;
 	int x, y, z, fac;
 
 	/* TODO: Allow modifying x, y, z and factor via xinput-properties for
@@ -1230,6 +1288,19 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 			    "MP-Normalizer started with (%i:%i:%i) * %i\n",
 			    x, y, z, fac);
 	}
+
+	t = xf86FindOptionValue(dev->info->options, "MPXAxis");
+	parse_axis(dev, t, &dev->mp_x, 0);
+	t = xf86FindOptionValue(dev->info->options, "MPXScale");
+	parse_scale(dev, t, &dev->mp_x_scale);
+	t = xf86FindOptionValue(dev->info->options, "MPYAxis");
+	parse_axis(dev, t, &dev->mp_y, 1);
+	t = xf86FindOptionValue(dev->info->options, "MPYScale");
+	parse_scale(dev, t, &dev->mp_y_scale);
+	t = xf86FindOptionValue(dev->info->options, "MPZAxis");
+	parse_axis(dev, t, &dev->mp_z, 2);
+	t = xf86FindOptionValue(dev->info->options, "MPZScale");
+	parse_scale(dev, t, &dev->mp_z_scale);
 }
 
 static void xwiimote_configure(struct xwiimote_dev *dev)
@@ -1310,6 +1381,12 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	info->read_input = NULL;
 	info->switch_mode = NULL;
 	info->fd = -1;
+	dev->mp_x = 0;
+	dev->mp_y = 1;
+	dev->mp_z = 2;
+	dev->mp_x_scale = 1;
+	dev->mp_y_scale = 1;
+	dev->mp_z_scale = 1;
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
