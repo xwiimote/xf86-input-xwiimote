@@ -25,7 +25,7 @@
 
 AC_PREREQ(2.68)
 AC_INIT([xf86-input-xwiimote],
-        0.4,
+        0.5,
         [https://github.com/dvdhrm/xorg-input-xwiimote],
         xf86-input-xwiimote)
 
