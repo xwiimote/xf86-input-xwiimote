@@ -114,6 +114,11 @@ struct xwiimote_dev {
 	int mp_y_scale;
 	int mp_z_scale;
 
+	int ir_vec_x;
+	int ir_vec_y;
+	int ir_ref_x;
+	int ir_ref_y;
+
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
 };
@@ -407,7 +412,7 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 
 static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
-	const struct xwii_event_abs *e, *best;
+	struct xwii_event_abs *a, *b, *c, d;
 	int absolute, i;
 
 	absolute = dev->motion == MOTION_ABS;
@@ -415,31 +420,53 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	if (dev->motion_source != SOURCE_IR)
 		return;
 
-	/*
-	 * For the xf86 driver, we cannot base IR on the middle of the
-	 * sensor bar. We wouldn't be able to reach extremity values.
-	 * Instead just use the most left (then most upper) point we find.
-	 */
-
-	best = NULL;
-
+	/* Grab first two valid points */
+	a = b = NULL;
 	for (i = 0; i < 4; ++i) {
-		e = &ev->v.abs[i];
+		c = &ev->v.abs[i];
+		if (xwii_event_ir_is_valid(c) && (c->x || c->y)) {
+			if (!a) {
+				a = c;
+			} else {
+				b = c;
+				break;
+			}
+		}
+	}
+	if (!a)
+		return;
 
-		if (!xwii_event_ir_is_valid(e))
-			continue;
-
-		if (!best)
-			best = e;
-		else if (e->x < best->x)
-			best = e;
-		else if (e->x == best->x && e->y < best->y)
-			best = e;
+	if (!b) {
+		/* Generate the second point based on historical data */
+		b = &d;
+		b->x = a->x - dev->ir_vec_x;
+		b->y = a->y - dev->ir_vec_y;
+		if ((a->x - dev->ir_ref_x) * (a->x - dev->ir_ref_x) +
+				(a->y - dev->ir_ref_y) * (a->y - dev->ir_ref_y) <
+				(b->x - dev->ir_ref_x) * (b->x - dev->ir_ref_x) +
+			    (b->y - dev->ir_ref_y) * (b->y - dev->ir_ref_y)) {
+			b->x = a->x + dev->ir_vec_x;
+			b->y = a->y + dev->ir_vec_y;
+			dev->ir_ref_x = a->x;
+			dev->ir_ref_y = a->y;
+		} else {
+			dev->ir_ref_x = b->x;
+			dev->ir_ref_y = b->y;
+		}
+	} else {
+		/* Record some data in case one of the points disappears */
+		dev->ir_vec_x = b->x - a->x;
+		dev->ir_vec_y = b->y - a->y;
+		dev->ir_ref_x = a->x;
+		dev->ir_ref_y = a->y;
 	}
 
-	if (best)
-		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
-				    1023 - best->x, best->y);
+	/* Final point is the average of both points */
+	a->x = (a->x + b->x) / 2;
+	a->y = (a->y + b->y) / 2;
+
+	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
+				1023 - a->x, a->y);
 }
 
 static int32_t get_mp_axis(struct xwiimote_dev *dev,
