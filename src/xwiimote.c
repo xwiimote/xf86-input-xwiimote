@@ -50,8 +50,11 @@
 #define XWIIMOTE_ACCEL_HISTORY_NUM 12
 #define XWIIMOTE_ACCEL_HISTORY_MOD 2
 
-#define XWIIMOTE_IR_HISTORY_NUM 8
 #define XWIIMOTE_IR_AVG_RADIUS 10
+#define XWIIMOTE_IR_AVG_MAX 8
+#define XWIIMOTE_IR_AVG_MIN 4
+
+#define XWIIMOTE_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
 static char xwiimote_name[] = "xwiimote";
 
@@ -121,8 +124,9 @@ struct xwiimote_dev {
 	int ir_vec_y;
 	int ir_ref_x;
 	int ir_ref_y;
-	struct xwii_event_abs ir_history_ev[XWIIMOTE_IR_HISTORY_NUM];
-	int ir_history_cur;
+	int ir_avg_x;
+	int ir_avg_y;
+	int ir_avg_count;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -446,10 +450,8 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 		b = &d;
 		b->x = a->x - dev->ir_vec_x;
 		b->y = a->y - dev->ir_vec_y;
-		if ((a->x - dev->ir_ref_x) * (a->x - dev->ir_ref_x) +
-				(a->y - dev->ir_ref_y) * (a->y - dev->ir_ref_y) <
-				(b->x - dev->ir_ref_x) * (b->x - dev->ir_ref_x) +
-			    (b->y - dev->ir_ref_y) * (b->y - dev->ir_ref_y)) {
+		if (XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_ref_x, dev->ir_ref_y)
+				< XWIIMOTE_DISTSQ(b->x, b->y, dev->ir_ref_x, dev->ir_ref_y)) {
 			b->x = a->x + dev->ir_vec_x;
 			b->y = a->y + dev->ir_vec_y;
 			dev->ir_ref_x = a->x;
@@ -470,20 +472,19 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	a->x = (a->x + b->x) / 2;
 	a->y = (a->y + b->y) / 2;
 
-	/* Keep a running average and use that if it's close enough */
-	dev->ir_history_ev[dev->ir_history_cur] = *a;
-	dev->ir_history_cur = (dev->ir_history_cur % XWIIMOTE_IR_HISTORY_NUM);
-	d = dev->ir_history_ev[0];
-	for (i = 1; i < XWIIMOTE_IR_HISTORY_NUM; ++i) {
-		d.x += dev->ir_history_ev[i].x;
-		d.y += dev->ir_history_ev[i].y;
-	}
-	d.x /= XWIIMOTE_IR_HISTORY_NUM;
-	d.y /= XWIIMOTE_IR_HISTORY_NUM;
-	if ((a->x - d.x) * (a->x - d.x) + (a->y - d.y) * (a->y - d.y)
+	/* Start averaging if the location is consistant */
+	dev->ir_avg_x = (dev->ir_avg_x * dev->ir_avg_count + a->x) / (dev->ir_avg_count+1);
+	dev->ir_avg_y = (dev->ir_avg_y * dev->ir_avg_count + a->y) / (dev->ir_avg_count+1);
+	if (++dev->ir_avg_count > XWIIMOTE_IR_AVG_MAX)
+		dev->ir_avg_count = XWIIMOTE_IR_AVG_MAX;
+	if (XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_avg_x, dev->ir_avg_y)
 			< XWIIMOTE_IR_AVG_RADIUS * XWIIMOTE_IR_AVG_RADIUS) {
-		a->x = d.x;
-		a->y = d.y;
+		if (dev->ir_avg_count >= XWIIMOTE_IR_AVG_MIN) {
+			a->x = (a->x + dev->ir_avg_x * (XWIIMOTE_IR_AVG_MIN-1)) / XWIIMOTE_IR_AVG_MIN;
+			a->y = (a->y + dev->ir_avg_y * (XWIIMOTE_IR_AVG_MIN-1)) / XWIIMOTE_IR_AVG_MIN;
+		}
+	} else {
+		dev->ir_avg_count = 0;
 	}
 
 	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
