@@ -422,7 +422,7 @@ static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
 static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
 	struct xwii_event_abs *a, *b, *c, d;
-	int absolute, i;
+	int absolute, i, dists[6];
 
 	absolute = dev->motion == MOTION_ABS;
 
@@ -436,9 +436,31 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 		if (xwii_event_ir_is_valid(c) && (c->x || c->y)) {
 			if (!a) {
 				a = c;
-			} else {
+			} else if (!b) {
 				b = c;
-				break;
+			} else {
+				/* This may be a noisy point. Keep the two points that are
+				 * closest to the reference points. */
+				d.x = dev->ir_ref_x + dev->ir_vec_x;
+				d.y = dev->ir_ref_y + dev->ir_vec_y;
+				dists[0] = XWIIMOTE_DISTSQ(c->x, c->y, dev->ir_ref_x, dev->ir_ref_y);
+				dists[1] = XWIIMOTE_DISTSQ(c->x, c->y, d.x, d.y);
+				dists[2] = XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_ref_x, dev->ir_ref_y);
+				dists[3] = XWIIMOTE_DISTSQ(a->x, a->y, d.x, d.y);
+				dists[4] = XWIIMOTE_DISTSQ(b->x, b->y, dev->ir_ref_x, dev->ir_ref_y);
+				dists[5] = XWIIMOTE_DISTSQ(b->x, b->y, d.x, d.y);
+				if (dists[1] < dists[0]) dists[0] = dists[1];
+				if (dists[3] < dists[2]) dists[2] = dists[3];
+				if (dists[5] < dists[4]) dists[4] = dists[5];
+				if (dists[0] < dists[2]) {
+					if (dists[4] < dists[2]) {
+						a = c;
+					} else {
+						b = c;
+					}
+				} else if (dists[0] < dists[4]) {
+					b = c;
+				}
 			}
 		}
 	}
