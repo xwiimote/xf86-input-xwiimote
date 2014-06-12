@@ -50,6 +50,9 @@
 #define XWIIMOTE_ACCEL_HISTORY_NUM 12
 #define XWIIMOTE_ACCEL_HISTORY_MOD 2
 
+#define XWIIMOTE_IR_HISTORY_NUM 8
+#define XWIIMOTE_IR_AVG_RADIUS 10
+
 static char xwiimote_name[] = "xwiimote";
 
 enum func_type {
@@ -118,6 +121,8 @@ struct xwiimote_dev {
 	int ir_vec_y;
 	int ir_ref_x;
 	int ir_ref_y;
+	struct xwii_event_abs ir_history_ev[XWIIMOTE_IR_HISTORY_NUM];
+	int ir_history_cur;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -464,6 +469,22 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	/* Final point is the average of both points */
 	a->x = (a->x + b->x) / 2;
 	a->y = (a->y + b->y) / 2;
+
+	/* Keep a running average and use that if it's close enough */
+	dev->ir_history_ev[dev->ir_history_cur] = *a;
+	dev->ir_history_cur = (dev->ir_history_cur % XWIIMOTE_IR_HISTORY_NUM);
+	d = dev->ir_history_ev[0];
+	for (i = 1; i < XWIIMOTE_IR_HISTORY_NUM; ++i) {
+		d.x += dev->ir_history_ev[i].x;
+		d.y += dev->ir_history_ev[i].y;
+	}
+	d.x /= XWIIMOTE_IR_HISTORY_NUM;
+	d.y /= XWIIMOTE_IR_HISTORY_NUM;
+	if ((a->x - d.x) * (a->x - d.x) + (a->y - d.y) * (a->y - d.y)
+			< XWIIMOTE_IR_AVG_RADIUS * XWIIMOTE_IR_AVG_RADIUS) {
+		a->x = d.x;
+		a->y = d.y;
+	}
 
 	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
 				1023 - a->x, a->y);
