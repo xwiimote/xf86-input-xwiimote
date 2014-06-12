@@ -54,6 +54,8 @@
 #define XWIIMOTE_IR_AVG_MAX 8
 #define XWIIMOTE_IR_AVG_MIN 4
 
+#define XWIIMOTE_IR_KEYMAP_EXPIRY_SECS 1
+
 #define XWIIMOTE_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
 static char xwiimote_name[] = "xwiimote";
@@ -113,7 +115,7 @@ struct xwiimote_dev {
 	unsigned int motion;
 	unsigned int motion_source;
 	struct func map_key[2][XWII_KEY_NUM];
-	int map_key_set;
+	int key_pressed[XWII_KEY_NUM];
 	unsigned int mp_x;
 	unsigned int mp_y;
 	unsigned int mp_z;
@@ -121,6 +123,7 @@ struct xwiimote_dev {
 	int mp_y_scale;
 	int mp_z_scale;
 
+	struct timeval ir_last_valid_event;
 	int ir_vec_x;
 	int ir_vec_y;
 	int ir_ref_x;
@@ -360,6 +363,7 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 	unsigned int key;
 	int btn;
 	int absolute = 0;
+	int keyset = 0;
 
 	code = ev->v.key.code;
 	state = ev->v.key.state;
@@ -371,14 +375,25 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 	if (dev->motion == MOTION_ABS)
 		absolute = 1;
 
-	switch (dev->map_key[dev->map_key_set][code].type) {
+	if (ev->v.key.state) {
+		if (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + XWIIMOTE_IR_KEYMAP_EXPIRY_SECS
+				|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + XWIIMOTE_IR_KEYMAP_EXPIRY_SECS
+					&& ev->time.tv_usec < dev->ir_last_valid_event.tv_usec)) {
+			keyset = 1;
+		}
+		dev->key_pressed[code] = keyset;
+	} else {
+		keyset = dev->key_pressed[code];
+	}
+
+	switch (dev->map_key[keyset][code].type) {
 		case FUNC_BTN:
-			btn = dev->map_key[dev->map_key_set][code].u.btn;
+			btn = dev->map_key[keyset][code].u.btn;
 			xf86PostButtonEvent(dev->info->dev, absolute, btn,
 								state, 0, 0);
 			break;
 		case FUNC_KEY:
-			key = dev->map_key[dev->map_key_set][code].u.key + MIN_KEYCODE;
+			key = dev->map_key[keyset][code].u.key + MIN_KEYCODE;
 			xf86PostKeyboardEvent(dev->info->dev, key, state);
 			break;
 		case FUNC_IGNORE:
@@ -426,7 +441,6 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	int absolute, i, dists[6];
 
 	absolute = dev->motion == MOTION_ABS;
-	dev->map_key_set = 0;
 
 	if (dev->motion_source != SOURCE_IR)
 		return;
@@ -514,7 +528,7 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
 				1023 - a->x, a->y);
 
-	dev->map_key_set = 1;
+	dev->ir_last_valid_event = ev->time;
 }
 
 static int32_t get_mp_axis(struct xwiimote_dev *dev,
