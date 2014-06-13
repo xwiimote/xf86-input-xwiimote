@@ -51,12 +51,14 @@
 #define XWIIMOTE_ACCEL_HISTORY_MOD 2
 
 #define XWIIMOTE_IR_AVG_RADIUS 10
-#define XWIIMOTE_IR_AVG_MAX 8
-#define XWIIMOTE_IR_AVG_MIN 4
+#define XWIIMOTE_IR_AVG_MAX_SAMPLES 8
+#define XWIIMOTE_IR_AVG_MIN_SAMPLES 4
+#define XWIIMOTE_IR_AVG_WEIGHT 3
 
 #define XWIIMOTE_IR_KEYMAP_EXPIRY_SECS 1
 
-#define XWIIMOTE_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
+#define XWIIMOTE_DISTSQ(ax, ay, bx, by) \
+	((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
 static char xwiimote_name[] = "xwiimote";
 
@@ -101,6 +103,13 @@ enum motion_source {
 	SOURCE_MOTIONPLUS,
 };
 
+enum keyset {
+	KEYSET_NORMAL,
+	KEYSET_IR,
+
+	KEYSET_NUM
+};
+
 struct xwiimote_dev {
 	InputInfoPtr info;
 	void *handler;
@@ -114,8 +123,8 @@ struct xwiimote_dev {
 	XkbRMLVOSet rmlvo;
 	unsigned int motion;
 	unsigned int motion_source;
-	struct func map_key[2][XWII_KEY_NUM];
-	int key_pressed[XWII_KEY_NUM];
+	struct func map_key[KEYSET_NUM][XWII_KEY_NUM];
+	enum keyset key_pressed[XWII_KEY_NUM];
 	unsigned int mp_x;
 	unsigned int mp_y;
 	unsigned int mp_z;
@@ -131,6 +140,12 @@ struct xwiimote_dev {
 	int ir_avg_x;
 	int ir_avg_y;
 	int ir_avg_count;
+
+	int ir_avg_radius;
+	int ir_avg_max_samples;
+	int ir_avg_min_samples;
+	int ir_avg_weight;
+	int ir_keymap_expiry_secs;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -363,7 +378,7 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 	unsigned int key;
 	int btn;
 	int absolute = 0;
-	int keyset = 0;
+	enum keyset keyset = KEYSET_NORMAL;
 
 	code = ev->v.key.code;
 	state = ev->v.key.state;
@@ -376,10 +391,10 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 		absolute = 1;
 
 	if (ev->v.key.state) {
-		if (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + XWIIMOTE_IR_KEYMAP_EXPIRY_SECS
-				|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + XWIIMOTE_IR_KEYMAP_EXPIRY_SECS
+		if (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
+				|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
 					&& ev->time.tv_usec < dev->ir_last_valid_event.tv_usec)) {
-			keyset = 1;
+			keyset = KEYSET_IR;
 		}
 		dev->key_pressed[code] = keyset;
 	} else {
@@ -513,13 +528,13 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	/* Start averaging if the location is consistant */
 	dev->ir_avg_x = (dev->ir_avg_x * dev->ir_avg_count + a->x) / (dev->ir_avg_count+1);
 	dev->ir_avg_y = (dev->ir_avg_y * dev->ir_avg_count + a->y) / (dev->ir_avg_count+1);
-	if (++dev->ir_avg_count > XWIIMOTE_IR_AVG_MAX)
-		dev->ir_avg_count = XWIIMOTE_IR_AVG_MAX;
+	if (++dev->ir_avg_count > dev->ir_avg_max_samples)
+		dev->ir_avg_count = dev->ir_avg_max_samples;
 	if (XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_avg_x, dev->ir_avg_y)
-			< XWIIMOTE_IR_AVG_RADIUS * XWIIMOTE_IR_AVG_RADIUS) {
-		if (dev->ir_avg_count >= XWIIMOTE_IR_AVG_MIN) {
-			a->x = (a->x + dev->ir_avg_x * (XWIIMOTE_IR_AVG_MIN-1)) / XWIIMOTE_IR_AVG_MIN;
-			a->y = (a->y + dev->ir_avg_y * (XWIIMOTE_IR_AVG_MIN-1)) / XWIIMOTE_IR_AVG_MIN;
+			< dev->ir_avg_radius * dev->ir_avg_radius) {
+		if (dev->ir_avg_count >= dev->ir_avg_min_samples) {
+			a->x = (a->x + dev->ir_avg_x * dev->ir_avg_weight) / (dev->ir_avg_weight+1);
+			a->y = (a->y + dev->ir_avg_y * dev->ir_avg_weight) / (dev->ir_avg_weight+1);
 		}
 	} else {
 		dev->ir_avg_count = 0;
@@ -1394,10 +1409,10 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 
 static void xwiimote_configure(struct xwiimote_dev *dev)
 {
-	const char *motion, *key;
+	const char *motion, *key, *param;
 
-	memcpy(dev->map_key[0], map_key_default, sizeof(map_key_default));
-	memcpy(dev->map_key[1], map_key_default, sizeof(map_key_default));
+	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
+	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
 
 	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
 	if (!motion)
@@ -1417,71 +1432,93 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 		dev->ifs |= XWII_IFACE_MOTION_PLUS;
 	}
 
+	param = xf86FindOptionValue(dev->info->options, "IrAvgRadius");
+	dev->ir_avg_radius = param ? atoi(param) : XWIIMOTE_IR_AVG_RADIUS;
+
+	param = xf86FindOptionValue(dev->info->options, "IrAvgMaxSamples");
+	dev->ir_avg_max_samples = param ? atoi(param) : XWIIMOTE_IR_AVG_MAX_SAMPLES;
+	if (dev->ir_avg_max_samples < 1) dev->ir_avg_max_samples = 1;
+
+	param = xf86FindOptionValue(dev->info->options, "IrAvgMinSamples");
+	dev->ir_avg_min_samples = param ? atoi(param) : XWIIMOTE_IR_AVG_MIN_SAMPLES;
+	if (dev->ir_avg_min_samples < 1) {
+		dev->ir_avg_min_samples = 1;
+	} else if (dev->ir_avg_min_samples > dev->ir_avg_max_samples) {
+		dev->ir_avg_min_samples = dev->ir_avg_max_samples;
+	}
+
+	param = xf86FindOptionValue(dev->info->options, "IrAvgWeight");
+	dev->ir_avg_weight = param ? atoi(param) : XWIIMOTE_IR_AVG_WEIGHT;
+	if (dev->ir_avg_weight < 0) dev->ir_avg_weight = 0;
+
+	param = xf86FindOptionValue(dev->info->options, "IrKeymapExpirySecs");
+	dev->ir_keymap_expiry_secs = param ? atoi(param) : XWIIMOTE_IR_KEYMAP_EXPIRY_SECS;
+
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_LEFT]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_LEFT]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapRight");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_RIGHT]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_RIGHT]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapUp");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_UP]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_UP]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapDown");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_DOWN]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_DOWN]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapA");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_A]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_A]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapB");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_B]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_B]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapPlus");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_PLUS]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_PLUS]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapMinus");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_MINUS]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_MINUS]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapHome");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_HOME]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_HOME]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapOne");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_ONE]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ONE]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapTwo");
-	parse_key(dev, key, &dev->map_key[0][XWII_KEY_TWO]);
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TWO]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRLeft");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_LEFT]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_LEFT]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRRight");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_RIGHT]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_RIGHT]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRUp");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_UP]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_UP]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRDown");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_DOWN]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_DOWN]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRA");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_A]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_A]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRB");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_B]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_B]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRPlus");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_PLUS]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_PLUS]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRMinus");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_MINUS]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_MINUS]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRHome");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_HOME]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_HOME]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIROne");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_ONE]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ONE]);
 
 	key = xf86FindOptionValue(dev->info->options, "MapIRTwo");
-	parse_key(dev, key, &dev->map_key[1][XWII_KEY_TWO]);
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TWO]);
 
 	xwiimote_configure_mp(dev);
 }
