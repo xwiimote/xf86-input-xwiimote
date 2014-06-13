@@ -1407,9 +1407,36 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 	parse_scale(dev, t, &dev->mp_z_scale);
 }
 
+static void xwiimote_configure_ir(struct xwiimote_dev *dev)
+{
+	const char *t;
+
+	t = xf86FindOptionValue(dev->info->options, "IrAvgRadius");
+	parse_scale(dev, t, &dev->ir_avg_radius);
+
+	t = xf86FindOptionValue(dev->info->options, "IrAvgMaxSamples");
+	parse_scale(dev, t, &dev->ir_avg_max_samples);
+	if (dev->ir_avg_max_samples < 1) dev->ir_avg_max_samples = 1;
+
+	t = xf86FindOptionValue(dev->info->options, "IrAvgMinSamples");
+	parse_scale(dev, t, &dev->ir_avg_min_samples);
+	if (dev->ir_avg_min_samples < 1) {
+		dev->ir_avg_min_samples = 1;
+	} else if (dev->ir_avg_min_samples > dev->ir_avg_max_samples) {
+		dev->ir_avg_min_samples = dev->ir_avg_max_samples;
+	}
+
+	t = xf86FindOptionValue(dev->info->options, "IrAvgWeight");
+	parse_scale(dev, t, &dev->ir_avg_weight);
+	if (dev->ir_avg_weight < 0) dev->ir_avg_weight = 0;
+
+	t = xf86FindOptionValue(dev->info->options, "IrKeymapExpirySecs");
+	parse_scale(dev, t, &dev->ir_keymap_expiry_secs);
+}
+
 static void xwiimote_configure(struct xwiimote_dev *dev)
 {
-	const char *motion, *key, *param;
+	const char *motion, *key;
 
 	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
 	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
@@ -1431,28 +1458,6 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 		dev->motion_source = SOURCE_MOTIONPLUS;
 		dev->ifs |= XWII_IFACE_MOTION_PLUS;
 	}
-
-	param = xf86FindOptionValue(dev->info->options, "IrAvgRadius");
-	dev->ir_avg_radius = param ? atoi(param) : XWIIMOTE_IR_AVG_RADIUS;
-
-	param = xf86FindOptionValue(dev->info->options, "IrAvgMaxSamples");
-	dev->ir_avg_max_samples = param ? atoi(param) : XWIIMOTE_IR_AVG_MAX_SAMPLES;
-	if (dev->ir_avg_max_samples < 1) dev->ir_avg_max_samples = 1;
-
-	param = xf86FindOptionValue(dev->info->options, "IrAvgMinSamples");
-	dev->ir_avg_min_samples = param ? atoi(param) : XWIIMOTE_IR_AVG_MIN_SAMPLES;
-	if (dev->ir_avg_min_samples < 1) {
-		dev->ir_avg_min_samples = 1;
-	} else if (dev->ir_avg_min_samples > dev->ir_avg_max_samples) {
-		dev->ir_avg_min_samples = dev->ir_avg_max_samples;
-	}
-
-	param = xf86FindOptionValue(dev->info->options, "IrAvgWeight");
-	dev->ir_avg_weight = param ? atoi(param) : XWIIMOTE_IR_AVG_WEIGHT;
-	if (dev->ir_avg_weight < 0) dev->ir_avg_weight = 0;
-
-	param = xf86FindOptionValue(dev->info->options, "IrKeymapExpirySecs");
-	dev->ir_keymap_expiry_secs = param ? atoi(param) : XWIIMOTE_IR_KEYMAP_EXPIRY_SECS;
 
 	key = xf86FindOptionValue(dev->info->options, "MapLeft");
 	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_LEFT]);
@@ -1521,6 +1526,7 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TWO]);
 
 	xwiimote_configure_mp(dev);
+	xwiimote_configure_ir(dev);
 }
 
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
@@ -1547,6 +1553,11 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	dev->mp_x_scale = 1;
 	dev->mp_y_scale = 1;
 	dev->mp_z_scale = 1;
+	dev->ir_avg_radius = XWIIMOTE_IR_AVG_RADIUS;
+	dev->ir_avg_max_samples = XWIIMOTE_IR_AVG_MAX_SAMPLES;
+	dev->ir_avg_min_samples = XWIIMOTE_IR_AVG_MIN_SAMPLES;
+	dev->ir_avg_weight = XWIIMOTE_IR_AVG_WEIGHT;
+	dev->ir_keymap_expiry_secs = XWIIMOTE_IR_KEYMAP_EXPIRY_SECS;
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
