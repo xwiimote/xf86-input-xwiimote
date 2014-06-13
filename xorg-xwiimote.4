@@ -20,6 +20,12 @@ xf86-input-xwiimote \- X.Org Nintendo Wii Remote Input Driver
 .BI "  Option \*qMPXAxis\*q       " "\*qx\*q or \*qy\*q or \*qz\*q"
 .BI "  Option \*qMPXScale\*q      \*q" Int \*q
 \ \ ...
+.BI "  Option \*qIRAvgRadius\*q   \*q" Int \*q
+.BI "  Option \*qIRAvgMaxSamples\*q \*q" Int \*q
+.BI "  Option \*qIRAvgMinSamples\*q \*q" Int \*q
+.BI "  Option \*qIRAvgWeight\*q   \*q" Int \*q
+.BI "  Option \*qIRKeymapExpirySecs\*q \*q" Int \*q
+\ \ ...
 .BI "  Option \*qMapLeft\*q       \*q" val \*q
 .BI "  Option \*qMapRight\*q      \*q" val \*q
 .BI "  Option \*qMapUp\*q         \*q" val \*q
@@ -31,6 +37,17 @@ xf86-input-xwiimote \- X.Org Nintendo Wii Remote Input Driver
 .BI "  Option \*qMapHome\*q       \*q" val \*q
 .BI "  Option \*qMapOne\*q        \*q" val \*q
 .BI "  Option \*qMapTwo\*q        \*q" val \*q
+.BI "  Option \*qMapIRLeft\*q     \*q" val \*q
+.BI "  Option \*qMapIRRight\*q    \*q" val \*q
+.BI "  Option \*qMapIRUp\*q       \*q" val \*q
+.BI "  Option \*qMapIRDown\*q     \*q" val \*q
+.BI "  Option \*qMapIRA\*q        \*q" val \*q
+.BI "  Option \*qMapIRB\*q        \*q" val \*q
+.BI "  Option \*qMapIRPlus\*q     \*q" val \*q
+.BI "  Option \*qMapIRMinus\*q    \*q" val \*q
+.BI "  Option \*qMapIRHome\*q     \*q" val \*q
+.BI "  Option \*qMapIROne\*q      \*q" val \*q
+.BI "  Option \*qMapIRTwo\*q      \*q" val \*q
 \ \ ...
 .BI "  Option \*qXkbRules\*q      \*q" rules \*q
 .BI "  Option \*qXkbModel\*q      \*q" model \*q
@@ -89,9 +106,7 @@ absolute pointer input.
 
 \fBir\fP means that the IR sensor is used to detect the mouse-location. You need
 to place an IR emitter in front of you. The Wii Remote has a built-in camera to
-scan it and calculate the pointer-position from it. Only a single IR source is
-used by this driver. If multiple IR sources are found, the upper-left most is
-used.
+scan it and calculate the pointer-position from it.
 
 \fBMotionPlus\fP means that the gyroscope of MotionPlus extensions (or Gen2.0
 Devices with built-in MotionPlus) is used. You need to set \fBMPNormalization\fP
@@ -138,6 +153,30 @@ MP-motion-source only uses X and Z axis for movement calculations.
 .RE
 
 .PP
+.IR "\fBOption \*qIRAvgRadius\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qIRAvgMaxSamples\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qIRAvgMinSamples\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qIRAvgWeight\*q \fP" "\*qInt\*q"
+.br
+.IR "\fBOption \*qIRKeymapExpirySecs\*q \fP" "\*qInt\*q"
+.RS
+If running in MotionSource IR configuration, IRAvgRadius (default: 10)
+configures the distance of a new data point at which the current averaging is
+discarded. IRAvgMaxSamples (default: 8) and IRAvgMinSamples (default: 4)
+configure respectively how points to average, and how many averaged points are
+needed before applying the averaged value to the cursor location. IRAvgWeight
+(default: 3) sets the weight of the averaged point in comparison to the current
+data point when generating the final cursor position.
+
+When the Wii Remote is turned away from the IR source, IRKeymapExpirySecs
+(default: 1) dictates how many seconds before the control mapping reverts to the
+non-IR keys.
+.RE
+
+.PP
 The following options specify keymaps for the buttons of a Wii Remote. The
 \fIval\fP field of the options must be one of the linux input-key/btn constants.
 You can find them in
@@ -151,79 +190,130 @@ Additional values are \fBnone\fP, \fBoff\fP, \fB0\fP or \fBfalse\fP to disable
 the given button or \fBleft-button\fP, \fBright-button\fP or \fBmiddle-button\fP
 to emulate mouse-buttons instead of keyboard keys.
 
-.IP "\fBOption \*qMapLeft\*q \fP\*qval\*q"
+When \fBMotionSource\fP is set to \fBir\fP and the Wii Remote is pointed
+towards the IR source, the IR mappings are used.  Otherwise, the non-IR
+mappings are used.
+
+.PP
+.IR "\fBOption \*qMapLeft\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRLeft\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B LEFT
 button of the Wii Remote. Default is
 .B KEY_LEFT
+.RE
 
-.IP "\fBOption \*qMapRight\*q \fP\*qval\*q"
+.PP
+.IR "\fBOption \*qMapRight\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRRight\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B RIGHT
 button of the Wii Remote. Default is
 .B KEY_RIGHT
+.RE
 
-.IP "\fBOption \*qMapUp\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapUp\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRUp\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B UP
 button of the Wii Remote. Default is
 .B KEY_UP
+.RE
 
-.IP "\fBOption \*qMapDown\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapDown\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRDown\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B DOWN
 button of the Wii Remote. Default is
 .B KEY_DOWN
+.RE
 
-.IP "\fBOption \*qMapA\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapA\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRA\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B A
 button of the Wii Remote. Default is
 .B KEY_ENTER
+.RE
 
-.IP "\fBOption \*qMapB\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapB\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRB\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B B
 button of the Wii Remote. Default is
 .B KEY_SPACE
+.RE
 
-.IP "\fBOption \*qMapPlus\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapPlus\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRPlus\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B PLUS
 button of the Wii Remote. Default is
 .B KEY_VOLUMEUP
+.RE
 
-.IP "\fBOption \*qMapMinus\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapMinus\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRMinus\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B MINUS
 button of the Wii Remote. Default is
 .B KEY_VOLUMEDOWN
+.RE
 
-.IP "\fBOption \*qMapHome\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapHome\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRHome\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B HOME
 button of the Wii Remote. Default is
 .B KEY_ESC
+.RE
 
-.IP "\fBOption \*qMapOne\*q \fP\*qval\*q"
-a
+.PP
+.IR "\fBOption \*qMapOne\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIROne\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B ONE
 button of the Wii Remote. Default is
 .B KEY_1
+.RE
 
-.IP "\fBOption \*qMapTwo\*q \fP\*qval\*q"
+.PP
+.IR "\fBOption \*qMapTwo\*q \fP\*qval\*q"
+.br
+.IR "\fBOption \*qMapIRTwo\*q \fP\*qval\*q"
+.RS
 Specify the mapping of the
 .B TWO
 button of the Wii Remote. Default is
 .B KEY_2
+.RE
 
 .PP
 The following options are standard X.org input device options which also apply

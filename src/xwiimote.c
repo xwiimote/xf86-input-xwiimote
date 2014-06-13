@@ -1411,14 +1411,14 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 {
 	const char *t;
 
-	t = xf86FindOptionValue(dev->info->options, "IrAvgRadius");
+	t = xf86FindOptionValue(dev->info->options, "IRAvgRadius");
 	parse_scale(dev, t, &dev->ir_avg_radius);
 
-	t = xf86FindOptionValue(dev->info->options, "IrAvgMaxSamples");
+	t = xf86FindOptionValue(dev->info->options, "IRAvgMaxSamples");
 	parse_scale(dev, t, &dev->ir_avg_max_samples);
 	if (dev->ir_avg_max_samples < 1) dev->ir_avg_max_samples = 1;
 
-	t = xf86FindOptionValue(dev->info->options, "IrAvgMinSamples");
+	t = xf86FindOptionValue(dev->info->options, "IRAvgMinSamples");
 	parse_scale(dev, t, &dev->ir_avg_min_samples);
 	if (dev->ir_avg_min_samples < 1) {
 		dev->ir_avg_min_samples = 1;
@@ -1426,11 +1426,11 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 		dev->ir_avg_min_samples = dev->ir_avg_max_samples;
 	}
 
-	t = xf86FindOptionValue(dev->info->options, "IrAvgWeight");
+	t = xf86FindOptionValue(dev->info->options, "IRAvgWeight");
 	parse_scale(dev, t, &dev->ir_avg_weight);
 	if (dev->ir_avg_weight < 0) dev->ir_avg_weight = 0;
 
-	t = xf86FindOptionValue(dev->info->options, "IrKeymapExpirySecs");
+	t = xf86FindOptionValue(dev->info->options, "IRKeymapExpirySecs");
 	parse_scale(dev, t, &dev->ir_keymap_expiry_secs);
 }
 
