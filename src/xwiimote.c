@@ -1717,7 +1717,8 @@ static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
 }
 
 
-static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *value, struct analog_stick_axis_func *config)
+static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *value,
+  struct analog_stick_axis_func *config, char const *stick_name, char const *axis_name)
 {
 	char const *c = value;
 	char v[40];
@@ -1739,7 +1740,7 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 			} else if (strcmp(v, "none") == 0) {
 				config->mode = MOTION_NONE;
 			} else {
-				//xf86Msg(X_WARNING, "%s: error parsing mode.i value: %s\n", name, v);
+				xf86Msg(X_WARNING, "%s %s: error parsing mode. value: %s\n", stick_name, axis_name, v);
 			}
 		} else if (sscanf(c, "keylow=%40s", v)) {
 			parse_key(dev, v, &config->map_low);
@@ -1749,22 +1750,25 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 			if (i > -1 && i < 100) {
 				config->deadzone = i;
 			} else {
-				//xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", name, i);
+				xf86Msg(X_WARNING, "%s %s: error parsing deadzone. value: %d\n", stick_name, axis_name, i);
 			}
 		} else if (sscanf(c, "amplify=%lf", &d)) {
 			if (d >= 0.0  && d < 10.0) {
 				config->amplify = d;
 			} else {
-				//xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", name, d);
+				xf86Msg(X_WARNING, "%s %s: error parsing amplify. value: %f\n", stick_name, axis_name, d);
 			}
 		}
+
+	  xf86Msg(X_INFO, "%s %s axis configured with mode=%d, deadzone=%d, amplify=%f\n", stick_name, axis_name, config->mode, config->deadzone, config->amplify);
 
 		/* Move past this option */
 		while (*c != ' ' && *c != '\t' && *c != '\0') c++;
 	}
 }
 
-static void parse_analog_stick_config(struct xwiimote_dev *dev, const char *key_prefix, struct analog_stick_func *config)
+static void parse_analog_stick_config(struct xwiimote_dev *dev,
+	const char *key_prefix, struct analog_stick_func *config, char const *stick_name)
 {
 	const char *value;
 	char key[100];
@@ -1774,12 +1778,12 @@ static void parse_analog_stick_config(struct xwiimote_dev *dev, const char *key_
 
 	if (snprintf(key, 100, "%sX", key_prefix) < 100) {
 		value = xf86FindOptionValue(dev->info->options, key);
-		parse_analog_stick_axis_config (dev, value, &config->x);
+		parse_analog_stick_axis_config (dev, value, &config->x, stick_name, "x");
 	}
 
 	if (snprintf(key, 100, "%sY", key_prefix) < 100) {
 		value = xf86FindOptionValue(dev->info->options, key);
-		parse_analog_stick_axis_config (dev, value, &config->y);
+		parse_analog_stick_axis_config (dev, value, &config->y, stick_name, "y");
 	}
 }
 
@@ -1865,11 +1869,11 @@ static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
 	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
 	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
 
-	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL]);
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR]);
+	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL], "left analog stick");
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick");
 
-	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL]);
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR]);
+	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "left analog stick");
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "left analog stick");
 }
 
 static void xwiimote_configure_keys(struct xwiimote_dev *dev)
