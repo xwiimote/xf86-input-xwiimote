@@ -1717,14 +1717,14 @@ static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
 }
 
 
-static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *config, struct analog_stick_axis_func *axis)
+static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *value, struct analog_stick_axis_func *config)
 {
-	char const *c = config;
+	char const *c = value;
 	char v[40];
 	int i;
 	double d;
 
-	if (!config)
+	if (!value)
 		return;
 
 	while (*c != '\0') {
@@ -1733,27 +1733,27 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 
 		if (sscanf(c, "mode=%40s", v)) {
 			if (strcmp(v, "relative") == 0) {
-				axis->mode = MOTION_REL;
+				config->mode = MOTION_REL;
 			} else if (strcmp(v, "absolute") == 0) {
-				axis->mode = MOTION_ABS;
+				config->mode = MOTION_ABS;
 			} else if (strcmp(v, "none") == 0) {
-				axis->mode = MOTION_NONE;
+				config->mode = MOTION_NONE;
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing mode.i value: %s\n", name, v);
 			}
 		} else if (sscanf(c, "keylow=%40s", v)) {
-			parse_key(dev, v, &axis->map_low);
+			parse_key(dev, v, &config->map_low);
 		} else if (sscanf(c, "keyhigh=%40s", v)) {
-			parse_key(dev, v, &axis->map_high);
+			parse_key(dev, v, &config->map_high);
 		} else if (sscanf(c, "deadzone=%i", &i)) {
 			if (i > -1 && i < 100) {
-				axis->deadzone = i;
+				config->deadzone = i;
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", name, i);
 			}
 		} else if (sscanf(c, "amplify=%lf", &d)) {
 			if (d >= 0.0  && d < 10.0) {
-				axis->amplify = d;
+				config->amplify = d;
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", name, d);
 			}
