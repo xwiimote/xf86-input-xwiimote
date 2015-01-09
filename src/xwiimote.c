@@ -1760,7 +1760,7 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 			}
 		}
 
-	  xf86Msg(X_INFO, "%s %s axis configured with mode=%d, deadzone=%d, amplify=%f\n", stick_name, axis_name, config->mode, config->deadzone, config->amplify);
+		xf86Msg(X_INFO, "%s %s axis configured with mode=%d, deadzone=%d, amplify=%f\n", stick_name, axis_name, config->mode, config->deadzone, config->amplify);
 
 		/* Move past this option */
 		while (*c != ' ' && *c != '\t' && *c != '\0') c++;
