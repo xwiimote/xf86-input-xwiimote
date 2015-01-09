@@ -1720,7 +1720,7 @@ static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
 static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *config, struct analog_stick_axis_func *axis)
 {
 	char const *c = config;
-	char v[15];
+	char v[40];
 	int i;
 	double d;
 
@@ -1731,7 +1731,7 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 		/* Skip any possible whitespace */
 		while ((*c == ' ' || *c == '\t') && *c != '\0') c++;
 
-		if (sscanf(c, "mode=%15s", v)) {
+		if (sscanf(c, "mode=%40s", v)) {
 			if (strcmp(v, "relative") == 0) {
 				axis->mode = MOTION_REL;
 			} else if (strcmp(v, "absolute") == 0) {
@@ -1741,9 +1741,9 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing mode.i value: %s\n", name, v);
 			}
-		} else if (sscanf(c, "keylow=%s", v)) {
+		} else if (sscanf(c, "keylow=%40s", v)) {
 			parse_key(dev, v, &axis->map_low);
-		} else if (sscanf(c, "keyhigh=%s", v)) {
+		} else if (sscanf(c, "keyhigh=%40s", v)) {
 			parse_key(dev, v, &axis->map_high);
 		} else if (sscanf(c, "deadzone=%i", &i)) {
 			if (i > -1 && i < 100) {
@@ -1862,6 +1862,9 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 
 static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
 {
+	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
+	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
+
 	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL]);
 	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR]);
 
@@ -1875,10 +1878,6 @@ static void xwiimote_configure_keys(struct xwiimote_dev *dev)
 
 	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
 	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
-
-	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
-	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
-
 
 	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
 	if (!motion)
