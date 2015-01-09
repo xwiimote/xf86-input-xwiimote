@@ -76,7 +76,28 @@ struct func {
 	} u;
 };
 
+enum analog_stick_type {
+	ANALOG_STICK_LEFT,
+	ANALOG_STICK_RIGHT,
+	ANALOG_STICK_NUM,
+	ANALOG_STICK_NUNCHUK = ANALOG_STICK_LEFT,
+};
+
+struct analog_stick_axis {
+	int32_t previous_value;
+	double amplified;
+	double delta;
+	double previous_delta; /*MOTION_ABS*/
+	double subpixel; /*MOTION_REL*/
+};
+
+struct analog_stick {
+	struct analog_stick_axis x;
+	struct analog_stick_axis y;
+};
+
 static struct func map_key_default[XWII_KEY_NUM] = {
+	/* Wiimote */
 	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
 	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
 	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
@@ -88,12 +109,41 @@ static struct func map_key_default[XWII_KEY_NUM] = {
 	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
 	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
 	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+
+	/* Nunchuck */
+	[XWII_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
+	[XWII_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+
+	/*Classic Controller*/
+	[XWII_KEY_X] =  { .type = FUNC_KEY, .u.key = KEY_RIGHTSHIFT },
+	[XWII_KEY_Y] =  { .type = FUNC_KEY, .u.key = KEY_RIGHTCTRL },
+	[XWII_KEY_TL] = { .type = FUNC_KEY, .u.key = KEY_PAGEUP },
+	[XWII_KEY_TR] = { .type = FUNC_KEY, .u.key = KEY_PAGEDOWN },
+	[XWII_KEY_ZL] = { .type = FUNC_KEY, .u.key = KEY_HOME },
+	[XWII_KEY_ZR] = { .type = FUNC_KEY, .u.key = KEY_END },
+
+	/* Pro Controller*/
+	[XWII_KEY_THUMBL] =  { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+	[XWII_KEY_THUMBR] =  { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
 };
 
 enum motion_type {
 	MOTION_NONE,
 	MOTION_ABS,
 	MOTION_REL,
+};
+
+struct analog_stick_axis_func {
+	int mode;
+	struct func map_high;
+	struct func map_low;
+	int32_t deadzone;
+	double amplify;
+};
+
+struct analog_stick_func {
+	struct analog_stick_axis_func x;
+	struct analog_stick_axis_func y;
 };
 
 enum motion_source {
@@ -108,6 +158,120 @@ enum keyset {
 	KEYSET_IR,
 
 	KEYSET_NUM
+};
+
+#define ANALOG_STICK_AMPLIFY_DEFAULT 1.0
+#define ANALOG_STICK_DEADZONE_DEFAULT 40
+
+static struct analog_stick_func map_analog_stick_left_default[KEYSET_NUM] = {
+	[KEYSET_NORMAL] = {
+		.x = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+
+	[KEYSET_IR] = {
+		.x = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+};
+
+static struct analog_stick_func map_analog_stick_right_default[KEYSET_NUM] = {
+	[KEYSET_NORMAL] = {
+		.x = {
+			.mode = MOTION_REL,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_REL,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+	[KEYSET_IR] = {
+		.x = {
+			.mode = MOTION_REL,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_REL,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
 };
 
 struct xwiimote_dev {
@@ -125,6 +289,11 @@ struct xwiimote_dev {
 	unsigned int motion_source;
 	struct func map_key[KEYSET_NUM][XWII_KEY_NUM];
 	enum keyset key_pressed[XWII_KEY_NUM];
+
+	struct analog_stick_func map_analog_stick[ANALOG_STICK_NUM][KEYSET_NUM];
+	struct analog_stick analog_stick[ANALOG_STICK_NUM];
+	enum keyset analog_direction_pressed[ANALOG_STICK_NUM][2];
+
 	unsigned int mp_x;
 	unsigned int mp_y;
 	unsigned int mp_z;
@@ -371,6 +540,14 @@ static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 	return Success;
 }
 
+
+static BOOL xwiimote_is_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	return (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
+			|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
+				&& ev->time.tv_usec < dev->ir_last_valid_event.tv_usec));
+}
+
 static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 {
 	unsigned int code;
@@ -391,9 +568,7 @@ static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
 		absolute = 1;
 
 	if (ev->v.key.state) {
-		if (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
-				|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
-					&& ev->time.tv_usec < dev->ir_last_valid_event.tv_usec)) {
+		if (xwiimote_is_ir(dev, ev)) {
 			keyset = KEYSET_IR;
 		}
 		dev->key_pressed[code] = keyset;
@@ -599,6 +774,184 @@ static void xwiimote_refresh(struct xwiimote_dev *dev)
 		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
 }
 
+static void nunchuk_refresh(struct xwiimote_dev *dev)
+{
+	if (xwii_iface_available(dev->iface) & XWII_IFACE_NUNCHUK) {
+		xwii_iface_open(dev->iface, XWII_IFACE_NUNCHUK);
+	}
+}
+
+static void press_key(struct xwiimote_dev *dev, int absolute, struct func *map_key) {
+	unsigned int key;
+	int btn;
+	xf86IDrvMsg(dev->info, X_INFO, "BREAK5 key press \n");
+
+	switch (map_key->type) {
+		case FUNC_BTN:
+			btn = map_key->u.btn;
+			xf86PostButtonEvent(dev->info->dev, absolute, btn,
+								1, 0, 0);
+			break;
+		case FUNC_KEY:
+			key = map_key->u.key + MIN_KEYCODE;
+			xf86PostKeyboardEvent(dev->info->dev, key, 1);
+			break;
+		case FUNC_IGNORE:
+		default:
+			break;
+	}
+}
+
+static void depress_key(struct xwiimote_dev *dev, int absolute, struct func *map_key) {
+	unsigned int key;
+	int btn;
+	xf86IDrvMsg(dev->info, X_INFO, "BREAK6 key depress \n");
+
+	switch (map_key->type) {
+		case FUNC_BTN:
+			btn = map_key->u.btn;
+			xf86PostButtonEvent(dev->info->dev, absolute, btn,
+								0, 0, 0);
+			break;
+		case FUNC_KEY:
+			key = map_key->u.key + MIN_KEYCODE;
+			xf86PostKeyboardEvent(dev->info->dev, key, 0);
+			break;
+		case FUNC_IGNORE:
+		default:
+			break;
+	}
+}
+
+static void handle_stick_axis(struct xwiimote_dev *dev, int32_t value, struct analog_stick_axis *axis, struct analog_stick_axis_func *config)
+{
+	double pixel;
+
+	axis->amplified = config->amplify * value;
+
+	/* Set up scroll value */
+	if (config->mode == MOTION_REL) {
+		axis->delta = fabs(axis->amplified);
+		axis->subpixel += axis->amplified - axis->delta;
+		pixel = fabs(axis->subpixel);
+		if (pixel != 0.0) {
+			axis->delta += pixel;
+			axis->subpixel = axis->subpixel - pixel;
+		}
+	} else if (config->mode == MOTION_ABS) {
+		axis->delta = axis->amplified - axis->previous_delta;
+	} else {
+		axis->delta = 0;
+	}
+
+	/* Handle key mappings */
+
+	if (value > config->deadzone && axis->previous_value <= config->deadzone) {
+		press_key(dev, config->mode, &config->map_high);
+		if (axis->previous_value < -config->deadzone) {
+			depress_key(dev, config->mode, &config->map_low);
+		}
+	}
+	// Axis moved to low 
+	else if (value < -config->deadzone && axis->previous_value >= -config->deadzone) {
+		press_key(dev, config->mode, &config->map_low);
+		if (axis->previous_value > config->deadzone) {
+			depress_key(dev, config->mode, &config->map_high);
+		}
+	}
+	// Axis moved to rest
+	else if (value >= -config->deadzone && value <= config->deadzone) {
+		if (axis->previous_value < -config->deadzone) {
+			depress_key(dev, config->mode, &config->map_low);
+		} else if (axis->previous_value > config->deadzone) {
+			depress_key(dev, config->mode, &config->map_high);
+		}
+	}
+
+	axis->previous_value = value;
+}
+
+static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *ev)
+{
+	struct analog_stick_func *config;
+	struct analog_stick *stick;
+	struct xwii_event_abs *abs;
+	enum keyset keyset;
+	BOOL is_ir;
+
+	stick = &dev->analog_stick[ANALOG_STICK_NUNCHUK];
+	config = dev->map_analog_stick[ANALOG_STICK_NUNCHUK];
+	abs = &ev->v.abs[0];
+	keyset = KEYSET_NORMAL;
+	is_ir = xwiimote_is_ir(dev, ev);
+
+	//Keep the prevous keyset of the previous button press, otherwise use what is appropriate
+	keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][0];
+	if (stick->x.previous_value > config[keyset].x.deadzone || stick->x.previous_value < -config[keyset].x.deadzone) {
+		keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][0];
+	} else {
+		keyset = (is_ir) ? KEYSET_IR : KEYSET_NORMAL;
+		dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][0] = keyset;
+	}
+	handle_stick_axis(dev, abs->x, &stick->x, &config[keyset].x);		
+
+	//Keep the prevous keyset of the previous button press, otherwise use what is appropriate
+	keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][1];
+	if (stick->y.previous_value > config[keyset].y.deadzone || stick->y.previous_value < -config[keyset].y.deadzone) {
+		keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][1];
+	} else {
+		keyset = (is_ir) ? KEYSET_IR : KEYSET_NORMAL;
+		dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][1] = keyset;
+	}
+	handle_stick_axis(dev, abs->y, &stick->y, &config[keyset].y);	   
+
+	/* Move the cursor if appropriate with the updated scroll values */
+	if (config->x.mode != MOTION_NONE || config->y.mode != MOTION_NONE) {
+		xf86PostMotionEvent(dev->info->dev, 0, 0, 2, stick->x.delta, stick->y.delta);
+		if (config->x.mode == MOTION_ABS) {
+			stick->x.previous_delta = stick->x.delta;
+		}
+		if (config->y.mode == MOTION_ABS) {
+			stick->y.previous_delta = stick->y.delta;
+		}
+	}
+}
+
+static void xwiimote_nunchuk_key(struct xwiimote_dev *dev, struct xwii_event *ev)
+{  
+	unsigned int code;
+	unsigned int state;
+	unsigned int key;
+	int btn;
+	int absolute = 0;
+	enum keyset keyset = KEYSET_NORMAL;
+
+	code = ev->v.key.code;
+	state = ev->v.key.state;
+	if (code >= XWII_KEY_NUM)
+		return;
+	if (state > 1)
+		return;
+
+	if (dev->motion == MOTION_ABS)
+		absolute = 1;
+
+	switch (dev->map_key[keyset][code].type) {
+		case FUNC_BTN:
+			btn = dev->map_key[keyset][code].u.btn;
+			xf86PostButtonEvent(dev->info->dev, absolute, btn,
+								state, 0, 0);
+			break;
+		case FUNC_KEY:
+			key = dev->map_key[keyset][code].u.key + MIN_KEYCODE;
+			xf86PostKeyboardEvent(dev->info->dev, key, state);
+			break;
+		case FUNC_IGNORE:
+		default:
+			break;
+	}
+}
+
 static void xwiimote_input(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
@@ -619,6 +972,7 @@ static void xwiimote_input(int fd, pointer data)
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
 				xwiimote_refresh(dev);
+				nunchuk_refresh(dev);
 				break;
 			case XWII_EVENT_KEY:
 				xwiimote_key(dev, &ev);
@@ -630,6 +984,12 @@ static void xwiimote_input(int fd, pointer data)
 				xwiimote_ir(dev, &ev);
 			case XWII_EVENT_MOTION_PLUS:
 				xwiimote_motionplus(dev, &ev);
+				break;
+			case XWII_EVENT_NUNCHUK_KEY:
+				xwiimote_nunchuk_key(dev, &ev);
+				break;
+			case XWII_EVENT_NUNCHUK_MOVE:
+				xwiimote_nunchuk_stick(dev, &ev);
 				break;
 		}
 	} while (!ret);
@@ -647,7 +1007,8 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 	int ret;
 	InputInfoPtr info = device->public.devicePrivate;
 
-	ret = xwii_iface_open(dev->iface, dev->ifs);
+	ret = xwii_iface_open(dev->iface, xwii_iface_available(dev->iface));
+
 	if (ret)
 		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
 
@@ -750,7 +1111,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	driver = udev_device_get_driver(p);
 	subs = udev_device_get_subsystem(p);
 	if (!driver || strcmp(driver, "wiimote") ||
-	    !subs || strcmp(subs, "hid")) {
+		!subs || strcmp(subs, "hid")) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
@@ -1336,7 +1697,7 @@ static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *ou
 }
 
 static void parse_axis(struct xwiimote_dev *dev, const char *t,
-		       unsigned int *out, unsigned int def)
+			   unsigned int *out, unsigned int def)
 {
 	if (!t)
 		return;
@@ -1357,6 +1718,73 @@ static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
 	*out = atoi(t);
 }
 
+
+static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char *config, struct analog_stick_axis_func *axis)
+{
+	char const *c = config;
+	char v[15];
+	int i;
+	double d;
+
+	if (!config)
+		return;
+
+	while (*c != '\0') {
+		/* Skip any possible whitespace */
+		while ((*c == ' ' || *c == '\t') && *c != '\0') c++;
+
+		if (sscanf(c, "mode=%15s", v)) {
+			if (strcmp(v, "relative") == 0) {
+				axis->mode = MOTION_REL;
+			} else if (strcmp(v, "absolute") == 0) {
+				axis->mode = MOTION_ABS;
+			} else if (strcmp(v, "none") == 0) {
+				axis->mode = MOTION_NONE;
+			} else {
+				//xf86Msg(X_WARNING, "%s: error parsing mode.i value: %s\n", name, v);
+			}
+		} else if (sscanf(c, "keylow=%s", v)) {
+			parse_key(dev, v, &axis->map_low);
+		} else if (sscanf(c, "keyhigh=%s", v)) {
+			parse_key(dev, v, &axis->map_high);
+		} else if (sscanf(c, "deadzone=%i", &i)) {
+			if (i > -1 && i < 1000) {
+				axis->deadzone = i;
+			} else {
+				//xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", name, i);
+			}
+		} else if (sscanf(c, "amplify=%lf", &d)) {
+			if (d >= 0.0) {
+				axis->amplify = d;
+			} else {
+				//xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", name, d);
+			}
+		}
+
+		/* Move past this option */
+		while (*c != ' ' && *c != '\t' && *c != '\0') c++;
+	}
+}
+
+static void parse_analog_stick_config(struct xwiimote_dev *dev, const char *key_prefix, struct analog_stick_func *config)
+{
+	const char *value;
+	char key[100];
+
+	if (!key_prefix)
+		return;
+
+	if (snprintf(key, 100, "%sX", key_prefix) < 100) {
+		value = xf86FindOptionValue(dev->info->options, key);
+		parse_analog_stick_axis_config (dev, value, &config->x);
+	}
+
+	if (snprintf(key, 100, "%sY", key_prefix) < 100) {
+		value = xf86FindOptionValue(dev->info->options, key);
+		parse_analog_stick_axis_config (dev, value, &config->y);
+	}
+}
+
 static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 {
 	const char *normalize, *factor, *t;
@@ -1370,8 +1798,8 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 		factor = "";
 
 	if (!strcasecmp(factor, "on") ||
-	    !strcasecmp(factor, "true") ||
-	    !strcasecmp(factor, "yes"))
+		!strcasecmp(factor, "true") ||
+		!strcasecmp(factor, "yes"))
 		fac = 50;
 	else if (sscanf(factor, "%i", &fac) != 1)
 		fac = 0;
@@ -1381,16 +1809,16 @@ static void xwiimote_configure_mp(struct xwiimote_dev *dev)
 		normalize = "";
 
 	if (!strcasecmp(normalize, "on") ||
-	    !strcasecmp(normalize, "true") ||
-	    !strcasecmp(normalize, "yes")) {
+		!strcasecmp(normalize, "true") ||
+		!strcasecmp(normalize, "yes")) {
 		xwii_iface_set_mp_normalization(dev->iface, 0, 0, 0, fac);
 		xf86IDrvMsg(dev->info, X_INFO,
-			    "MP-Normalizer started with (0:0:0) * %i\n", fac);
+				"MP-Normalizer started with (0:0:0) * %i\n", fac);
 	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
 		xwii_iface_set_mp_normalization(dev->iface, x, y, z, fac);
 		xf86IDrvMsg(dev->info, X_INFO,
-			    "MP-Normalizer started with (%i:%i:%i) * %i\n",
-			    x, y, z, fac);
+				"MP-Normalizer started with (%i:%i:%i) * %i\n",
+				x, y, z, fac);
 	}
 
 	t = xf86FindOptionValue(dev->info->options, "MPXAxis");
@@ -1434,12 +1862,25 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 	parse_scale(dev, t, &dev->ir_keymap_expiry_secs);
 }
 
-static void xwiimote_configure(struct xwiimote_dev *dev)
+static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
+{
+	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL]);
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR]);
+
+	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL]);
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR]);
+}
+
+static void xwiimote_configure_keys(struct xwiimote_dev *dev)
 {
 	const char *motion, *key;
 
 	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
 	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
+
+	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
+	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
+
 
 	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
 	if (!motion)
@@ -1492,6 +1933,44 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	key = xf86FindOptionValue(dev->info->options, "MapTwo");
 	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TWO]);
 
+	/* Nunchuk */
+
+	key = xf86FindOptionValue(dev->info->options, "MapC");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_C]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapZ");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_Z]);
+
+	/* Classic Controller and Pro Controller */
+
+	key = xf86FindOptionValue(dev->info->options, "MapX");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_X]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapY");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_Y]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapTL");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapTR");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TR]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapZL");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ZL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapZR");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ZR]);
+
+   /* Pro Controller */
+
+	key = xf86FindOptionValue(dev->info->options, "MapTHUMBL");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_THUMBL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapTHUMBR");
+	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_THUMBR]);
+
+	/* IR Mode */
+
 	key = xf86FindOptionValue(dev->info->options, "MapIRLeft");
 	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_LEFT]);
 
@@ -1525,8 +2004,41 @@ static void xwiimote_configure(struct xwiimote_dev *dev)
 	key = xf86FindOptionValue(dev->info->options, "MapIRTwo");
 	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TWO]);
 
-	xwiimote_configure_mp(dev);
-	xwiimote_configure_ir(dev);
+	/* Nunchuk */
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRC");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_C]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRZ");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_Z]);
+
+	/* Classic Controller and Pro Controler */
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRX");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_X]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRY");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_Y]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRTL");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRTR");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TR]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRZL");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ZL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRZR");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ZR]);
+
+   /* Pro Controller */
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRTHUMBL");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_THUMBL]);
+
+	key = xf86FindOptionValue(dev->info->options, "MapIRTHUMBR");
+	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_THUMBR]);
 }
 
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
@@ -1575,6 +2087,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	if (!dev->info->name || strcmp(dev->info->name, XWII_NAME_CORE) ||
 							xwiimote_is_dev(dev)) {
 		xf86IDrvMsg(dev->info, X_INFO, "No core device\n");
+		xf86IDrvMsg(dev->info, X_INFO, "BREAK %s\n", dev->info->name);
 		dev->dup = true;
 		return Success;
 	}
@@ -1589,7 +2102,10 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 
 	xwiimote_add_dev(dev);
-	xwiimote_configure(dev);
+	xwiimote_configure_keys(dev);
+	xwiimote_configure_analog_sticks(dev);
+	xwiimote_configure_mp(dev);
+	xwiimote_configure_ir(dev);
 
 	return Success;
 
