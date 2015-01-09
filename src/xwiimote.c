@@ -1725,6 +1725,9 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 	int i;
 	double d;
 
+  char low_mapping[30];
+  char high_mapping[30];
+
 	if (!value)
 		return;
 
@@ -1760,11 +1763,35 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 			}
 		}
 
-		xf86Msg(X_INFO, "%s %s axis configured with mode=%d, deadzone=%d, amplify=%f\n", stick_name, axis_name, config->mode, config->deadzone, config->amplify);
-
 		/* Move past this option */
 		while (*c != ' ' && *c != '\t' && *c != '\0') c++;
 	}
+
+  switch (config->map_low.type) {
+    case FUNC_BTN:
+      snprintf(low_mapping, sizeof(low_mapping), ", low-mapping=%d [button]", config->map_low.u.btn);
+      break;
+    case FUNC_KEY:
+      snprintf(low_mapping, sizeof(low_mapping), ", high-mapping=%d [key]", config->map_low.u.key);
+      break;
+    default:
+      low_mapping[0] = '\0';
+      break;
+  }
+
+  switch (config->map_high.type) {
+    case FUNC_BTN:
+      snprintf(high_mapping, sizeof(high_mapping), ", high-mapping=%d [button]", config->map_high.u.btn);
+      break;
+    case FUNC_KEY:
+      snprintf(high_mapping, sizeof(high_mapping), ", high-mapping=%d [key]", config->map_high.u.key);
+      break;
+    default:
+      high_mapping[0] = '\0';
+      break;
+  }
+
+  xf86Msg(X_INFO, "%s %s axis configured with mode=%d, deadzone=%d, amplify=%f%s%s\n", stick_name, axis_name, config->mode, config->deadzone, config->amplify, low_mapping, high_mapping);
 }
 
 static void parse_analog_stick_config(struct xwiimote_dev *dev,
@@ -1870,10 +1897,10 @@ static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
 	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
 
 	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL], "left analog stick");
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick");
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick [ir mode]");
 
-	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "left analog stick");
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "left analog stick");
+	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "right analog stick");
+	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "right analog stick [ir mode]");
 }
 
 static void xwiimote_configure_keys(struct xwiimote_dev *dev)
