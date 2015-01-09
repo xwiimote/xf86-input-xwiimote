@@ -784,7 +784,6 @@ static void nunchuk_refresh(struct xwiimote_dev *dev)
 static void press_key(struct xwiimote_dev *dev, int absolute, struct func *map_key) {
 	unsigned int key;
 	int btn;
-	xf86IDrvMsg(dev->info, X_INFO, "BREAK5 key press \n");
 
 	switch (map_key->type) {
 		case FUNC_BTN:
@@ -805,7 +804,6 @@ static void press_key(struct xwiimote_dev *dev, int absolute, struct func *map_k
 static void depress_key(struct xwiimote_dev *dev, int absolute, struct func *map_key) {
 	unsigned int key;
 	int btn;
-	xf86IDrvMsg(dev->info, X_INFO, "BREAK6 key depress \n");
 
 	switch (map_key->type) {
 		case FUNC_BTN:
@@ -1748,13 +1746,13 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 		} else if (sscanf(c, "keyhigh=%s", v)) {
 			parse_key(dev, v, &axis->map_high);
 		} else if (sscanf(c, "deadzone=%i", &i)) {
-			if (i > -1 && i < 1000) {
+			if (i > -1 && i < 100) {
 				axis->deadzone = i;
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", name, i);
 			}
 		} else if (sscanf(c, "amplify=%lf", &d)) {
-			if (d >= 0.0) {
+			if (d >= 0.0  && d < 10.0) {
 				axis->amplify = d;
 			} else {
 				//xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", name, d);
@@ -2087,7 +2085,6 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	if (!dev->info->name || strcmp(dev->info->name, XWII_NAME_CORE) ||
 							xwiimote_is_dev(dev)) {
 		xf86IDrvMsg(dev->info, X_INFO, "No core device\n");
-		xf86IDrvMsg(dev->info, X_INFO, "BREAK %s\n", dev->info->name);
 		dev->dup = true;
 		return Success;
 	}
