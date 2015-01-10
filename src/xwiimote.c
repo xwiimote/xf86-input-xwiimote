@@ -54,6 +54,9 @@
 #define XWIIMOTE_IR_AVG_MAX_SAMPLES 8
 #define XWIIMOTE_IR_AVG_MIN_SAMPLES 4
 #define XWIIMOTE_IR_AVG_WEIGHT 3
+#define XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER 20
+#define XWIIMOTE_IR_MAX_Y 767
+#define XWIIMOTE_IR_MAX_X 1023
 
 #define XWIIMOTE_IR_KEYMAP_EXPIRY_SECS 1
 
@@ -408,6 +411,7 @@ struct xwiimote_dev {
 	int ir_avg_min_samples;
 	int ir_avg_weight;
 	int ir_keymap_expiry_secs;
+	int ir_continuous_scroll_border;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -615,7 +619,9 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 		ret = xwiimote_prepare_rel(dev, device, -10000, 10000, -10000, 10000);
 		break;
 	case SOURCE_IR:
-		ret = xwiimote_prepare_abs(dev, device, 0, 1023, 0, 767);
+		ret = xwiimote_prepare_abs(dev, device, 
+      XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER, XWIIMOTE_IR_MAX_X - XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER,
+      XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER, XWIIMOTE_IR_MAX_Y - XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER);
 		break;
 	default:
 		ret = Success;
@@ -808,8 +814,49 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 		dev->ir_avg_count = 0;
 	}
 
-	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
-				1023 - a->x, a->y);
+  /* Absolute scrolling */
+  {
+    int abs_x, abs_y;
+
+    abs_x = XWIIMOTE_IR_MAX_X - a->x;
+    if (abs_x < dev->ir_continuous_scroll_border) {
+      abs_x = dev->ir_continuous_scroll_border;
+    } else if (abs_x > XWIIMOTE_IR_MAX_X - dev->ir_continuous_scroll_border) {
+      abs_x = XWIIMOTE_IR_MAX_X - dev->ir_continuous_scroll_border;
+    }
+
+    abs_y = a->y;
+    if (abs_y < dev->ir_continuous_scroll_border) {
+      abs_y = dev->ir_continuous_scroll_border;
+    } else if (abs_y > XWIIMOTE_IR_MAX_Y - dev->ir_continuous_scroll_border) {
+      abs_y = XWIIMOTE_IR_MAX_Y - dev->ir_continuous_scroll_border;
+    }
+
+    xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, abs_x, abs_y);
+  }
+
+  /* Continuous scrolling at the edges of the screen */
+  {
+    int scroll_x, scroll_y;
+
+    if (a->x < dev->ir_continuous_scroll_border) {
+      scroll_x = -a->x;
+    } else if (a->x > XWIIMOTE_IR_MAX_X - dev->ir_continuous_scroll_border) {
+      scroll_x = a->x - (XWIIMOTE_IR_MAX_X - dev->ir_continuous_scroll_border);
+    } else {
+      scroll_x = 0;
+    }
+
+    if (a->y < dev->ir_continuous_scroll_border) {
+      scroll_y = -a->y;
+    } else if (a->y > XWIIMOTE_IR_MAX_Y - dev->ir_continuous_scroll_border) {
+      scroll_y = a->y - (XWIIMOTE_IR_MAX_Y - dev->ir_continuous_scroll_border);
+    } else {
+      scroll_y = 0;
+    }
+
+    xf86PostMotionEvent(dev->info->dev, 0, 0, 2, scroll_x, scroll_y);
+  }
 
 	dev->ir_last_valid_event = ev->time;
 }
@@ -1998,6 +2045,9 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 
 	t = xf86FindOptionValue(dev->info->options, "IRKeymapExpirySecs");
 	parse_scale(dev, t, &dev->ir_keymap_expiry_secs);
+
+	t = xf86FindOptionValue(dev->info->options, "IRContinuousScrollBorder");
+	parse_scale(dev, t, &dev->ir_continuous_scroll_border);
 }
 
 static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
@@ -2210,6 +2260,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	dev->ir_avg_min_samples = XWIIMOTE_IR_AVG_MIN_SAMPLES;
 	dev->ir_avg_weight = XWIIMOTE_IR_AVG_WEIGHT;
 	dev->ir_keymap_expiry_secs = XWIIMOTE_IR_KEYMAP_EXPIRY_SECS;
+	dev->ir_continuous_scroll_border = XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER;
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
