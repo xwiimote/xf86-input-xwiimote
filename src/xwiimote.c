@@ -96,6 +96,33 @@ struct analog_stick {
 	struct analog_stick_axis y;
 };
 
+
+const int ANALGOT_STICK_SLICE_CENTER_ANGLE = 360 / 8;
+const int ANALOG_STICK_SLICE_OUTER_ANGLE = (180 - ANALOG_STICK_SLICE_CENTER_ANGLE) / 2;
+
+int analog_stick_calculate_real_x(x, y) {
+    slope = y / x;
+    if (slope > 1) {
+      //scale changes for x
+      max_x = y + (x/tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
+
+      gradient_length = 2 * (tan(ANALOG_STICK_SLICE_CENTER_ANGLE / 2) * real_y);
+      gradient_slice = x / sin(ANALOG_STICK_SLICE_OUTER_ANGLE);
+
+      real_x = gradient_slice / gradient_length * max_x
+
+    } else {
+      //Map directly to to x axis
+      real_x = x + (y / tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
+    }
+}
+
+
+int analog_stick_calculate_real_y(x, y) {
+    return calc_realk_x(y, x);
+}
+
+
 static struct func map_key_default[XWII_KEY_NUM] = {
 	/* Wiimote */
 	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
@@ -980,9 +1007,9 @@ static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *
 
 	/* Move the cursor if appropriate with the updated scroll values */
 	if (config->x.mode != MOTION_NONE && config->y.mode != MOTION_NONE) {
-		xf86IDrvMsg(dev->info, X_INFO, "current value x: %d, current value y: %d\n", stick->x.previous_value, stick->y.previous_value);
-		xf86IDrvMsg(dev->info, X_INFO, "current x: %d, current y: %d\n", stick->x.delta, stick->y.delta);
-		xf86IDrvMsg(dev->info, X_INFO, "previous x: %d, previous y: %d\n", stick->x.previous_delta, stick->y.previous_delta);
+		xf86IDrvMsg(dev->info, X_INFO, "BREAK current value x: %d, current value y: %d\n", stick->x.previous_value, stick->y.previous_value);
+		xf86IDrvMsg(dev->info, X_INFO, "BREAK current x: %d, current y: %d\n", stick->x.delta, stick->y.delta);
+		xf86IDrvMsg(dev->info, X_INFO, "BREAK previous x: %d, previous y: %d\n", stick->x.previous_delta, stick->y.previous_delta);
 		xf86PostMotionEvent(dev->info->dev, 0, 0, 2, stick->x.delta, -stick->y.delta);
 	}
 }
