@@ -60,6 +60,12 @@
 #define XWIIMOTE_DISTSQ(ax, ay, bx, by) \
 	((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
+#define ANALOG_STICK_SLICE_CENTER_ANGLE 360 / 8
+#define ANALOG_STICK_SLICE_OUTER_ANGLE (180 - ANALOG_STICK_SLICE_CENTER_ANGLE) / 2
+
+#define ANALOG_STICK_AMPLIFY_DEFAULT 3
+#define ANALOG_STICK_DEADZONE_DEFAULT 40
+
 static char xwiimote_name[] = "xwiimote";
 
 enum func_type {
@@ -96,30 +102,33 @@ struct analog_stick {
 	struct analog_stick_axis y;
 };
 
+static int analog_stick_calculate_real_x(int x, int y) {
+    double slope;
+    double max_x;
+    double real_x;
+    double gradient_length;
+    double gradient_slice;
 
-const int ANALGOT_STICK_SLICE_CENTER_ANGLE = 360 / 8;
-const int ANALOG_STICK_SLICE_OUTER_ANGLE = (180 - ANALOG_STICK_SLICE_CENTER_ANGLE) / 2;
-
-int analog_stick_calculate_real_x(x, y) {
     slope = y / x;
-    if (slope > 1) {
+
+    if (slope > 1.0) {
       //scale changes for x
       max_x = y + (x/tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
 
-      gradient_length = 2 * (tan(ANALOG_STICK_SLICE_CENTER_ANGLE / 2) * real_y);
+      gradient_length = 2 * (tan(ANALOG_STICK_SLICE_CENTER_ANGLE / 2) * max_x);
       gradient_slice = x / sin(ANALOG_STICK_SLICE_OUTER_ANGLE);
 
-      real_x = gradient_slice / gradient_length * max_x
+      real_x = gradient_slice / gradient_length * max_x;
 
     } else {
       //Map directly to to x axis
       real_x = x + (y / tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
     }
+    return real_x;
 }
 
-
-int analog_stick_calculate_real_y(x, y) {
-    return calc_realk_x(y, x);
+static int analog_stick_calculate_real_y(int x, int y) {
+    return analog_stick_calculate_real_x(y, x);
 }
 
 
@@ -186,9 +195,6 @@ enum keyset {
 
 	KEYSET_NUM
 };
-
-#define ANALOG_STICK_AMPLIFY_DEFAULT 3
-#define ANALOG_STICK_DEADZONE_DEFAULT 40
 
 static struct analog_stick_func map_analog_stick_nunchuk_default[KEYSET_NUM] = {
 	[KEYSET_NORMAL] = {
@@ -978,12 +984,16 @@ static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *
 	struct xwii_event_abs *abs;
 	enum keyset keyset;
 	BOOL is_ir;
+  int real_x;
+  int real_y;
 
 	stick = &dev->analog_stick[ANALOG_STICK_NUNCHUK];
 	config = dev->map_analog_stick[ANALOG_STICK_NUNCHUK];
 	abs = &ev->v.abs[0];
 	keyset = KEYSET_NORMAL;
 	is_ir = xwiimote_is_ir(dev, ev);
+  real_x = analog_stick_calculate_real_x(abs->x, abs->y);
+  real_y = analog_stick_calculate_real_y(abs->x, abs->y);
 
 	//Keep the prevous keyset of the previous button press, otherwise use what is appropriate
 	keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][0];
@@ -993,7 +1003,7 @@ static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *
 		keyset = (is_ir) ? KEYSET_IR : KEYSET_NORMAL;
 		dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][0] = keyset;
 	}
-	handle_stick_axis(dev, abs->x, &stick->x, &config[keyset].x);		
+	handle_stick_axis(dev, real_x, &stick->x, &config[keyset].x);		
 
 	//Keep the prevous keyset of the previous button press, otherwise use what is appropriate
 	keyset = dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][1];
@@ -1003,7 +1013,7 @@ static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *
 		keyset = (is_ir) ? KEYSET_IR : KEYSET_NORMAL;
 		dev->analog_direction_pressed[ANALOG_STICK_NUNCHUK][1] = keyset;
 	}
-	handle_stick_axis(dev, abs->y, &stick->y, &config[keyset].y);	   
+	handle_stick_axis(dev, real_y, &stick->y, &config[keyset].y);	   
 
 	/* Move the cursor if appropriate with the updated scroll values */
 	if (config->x.mode != MOTION_NONE && config->y.mode != MOTION_NONE) {
