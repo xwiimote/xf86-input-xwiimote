@@ -86,8 +86,8 @@ enum analog_stick_type {
 struct analog_stick_axis {
 	int32_t previous_value;
 	double amplified;
-	double delta;
-	double previous_delta; /*MOTION_ABS*/
+	int32_t delta;
+	int32_t previous_delta; /*MOTION_ABS*/
 	double subpixel; /*MOTION_REL*/
 };
 
@@ -160,7 +160,7 @@ enum keyset {
 	KEYSET_NUM
 };
 
-#define ANALOG_STICK_AMPLIFY_DEFAULT 1.0
+#define ANALOG_STICK_AMPLIFY_DEFAULT 3
 #define ANALOG_STICK_DEADZONE_DEFAULT 40
 
 static struct analog_stick_func map_analog_stick_left_default[KEYSET_NUM] = {
@@ -823,23 +823,38 @@ static void depress_key(struct xwiimote_dev *dev, int absolute, struct func *map
 
 static void handle_stick_axis(struct xwiimote_dev *dev, int32_t value, struct analog_stick_axis *axis, struct analog_stick_axis_func *config)
 {
-	double pixel;
+	int32_t pixel;
 
-	axis->amplified = config->amplify * value;
+  if (abs(value) <= config->deadzone) {
+    value = 0;
+  }
 
 	/* Set up scroll value */
 	if (config->mode == MOTION_REL) {
-		axis->delta = fabs(axis->amplified);
+	  axis->amplified = pow((value / config->deadzone), config->amplify);
+    axis->previous_delta = axis->delta;
+		axis->delta = (int) axis->amplified;
 		axis->subpixel += axis->amplified - axis->delta;
-		pixel = fabs(axis->subpixel);
-		if (pixel != 0.0) {
+		pixel = (int) axis->subpixel;
+		if (pixel != 0) {
 			axis->delta += pixel;
-			axis->subpixel = axis->subpixel - pixel;
+			axis->subpixel -= pixel;
 		}
 	} else if (config->mode == MOTION_ABS) {
+    if (value != 0) {
+      if (value < 0) {
+        value += config->deadzone;
+      } else {
+        value -= config->deadzone;
+      }
+      value *= (100 / config->deadzone);
+    }
+	  axis->amplified = value * config->amplify;
 		axis->delta = axis->amplified - axis->previous_delta;
+    axis->previous_delta = axis->amplified;
 	} else {
 		axis->delta = 0;
+    axis->previous_delta = 0;
 	}
 
 	/* Handle key mappings */
@@ -904,14 +919,11 @@ static void xwiimote_nunchuk_stick(struct xwiimote_dev *dev, struct xwii_event *
 	handle_stick_axis(dev, abs->y, &stick->y, &config[keyset].y);	   
 
 	/* Move the cursor if appropriate with the updated scroll values */
-	if (config->x.mode != MOTION_NONE || config->y.mode != MOTION_NONE) {
-		xf86PostMotionEvent(dev->info->dev, 0, 0, 2, stick->x.delta, stick->y.delta);
-		if (config->x.mode == MOTION_ABS) {
-			stick->x.previous_delta = stick->x.delta;
-		}
-		if (config->y.mode == MOTION_ABS) {
-			stick->y.previous_delta = stick->y.delta;
-		}
+	if (config->x.mode != MOTION_NONE && config->y.mode != MOTION_NONE) {
+		xf86IDrvMsg(dev->info, X_INFO, "current value x: %d, current value y: %d\n", stick->x.previous_value, stick->y.previous_value);
+		xf86IDrvMsg(dev->info, X_INFO, "current x: %d, current y: %d\n", stick->x.delta, stick->y.delta);
+		xf86IDrvMsg(dev->info, X_INFO, "previous x: %d, previous y: %d\n", stick->x.previous_delta, stick->y.previous_delta);
+		xf86PostMotionEvent(dev->info->dev, 0, 0, 2, stick->x.delta, -stick->y.delta);
 	}
 }
 
@@ -1750,7 +1762,7 @@ static void parse_analog_stick_axis_config(struct xwiimote_dev *dev, const char 
 		} else if (sscanf(c, "keyhigh=%40s", v)) {
 			parse_key(dev, v, &config->map_high);
 		} else if (sscanf(c, "deadzone=%i", &i)) {
-			if (i > -1 && i < 100) {
+			if (i > 1 && i < 100) {
 				config->deadzone = i;
 			} else {
 				xf86Msg(X_WARNING, "%s %s: error parsing deadzone. value: %d\n", stick_name, axis_name, i);
