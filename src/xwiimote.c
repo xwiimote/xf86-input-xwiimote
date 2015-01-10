@@ -79,8 +79,8 @@ struct func {
 enum analog_stick_type {
 	ANALOG_STICK_LEFT,
 	ANALOG_STICK_RIGHT,
+	ANALOG_STICK_NUNCHUK,
 	ANALOG_STICK_NUM,
-	ANALOG_STICK_NUNCHUK = ANALOG_STICK_LEFT,
 };
 
 struct analog_stick_axis {
@@ -162,6 +162,66 @@ enum keyset {
 
 #define ANALOG_STICK_AMPLIFY_DEFAULT 3
 #define ANALOG_STICK_DEADZONE_DEFAULT 40
+
+static struct analog_stick_func map_analog_stick_nunchuk_default[KEYSET_NUM] = {
+	[KEYSET_NORMAL] = {
+		.x = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+
+	[KEYSET_IR] = {
+		.x = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = MOTION_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+};
 
 static struct analog_stick_func map_analog_stick_left_default[KEYSET_NUM] = {
 	[KEYSET_NORMAL] = {
@@ -1905,14 +1965,17 @@ static void xwiimote_configure_ir(struct xwiimote_dev *dev)
 
 static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
 {
+	memcpy(dev->map_analog_stick[ANALOG_STICK_NUNCHUK], map_analog_stick_nunchuk_default, sizeof(map_analog_stick_nunchuk_default));
+	parse_analog_stick_config(dev, "MapNunchukAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_NUNCHUK][KEYSET_NORMAL], "nunchuk analog stick");
+	parse_analog_stick_config(dev, "MapNunchukIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_NUNCHUK][KEYSET_IR], "nunchuk analog stick [ir mode]");
+
 	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
+	parse_analog_stick_config(dev, "MapClassicAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL], "left analog stick");
+	parse_analog_stick_config(dev, "MapIRClassicAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick [ir mode]");
+
 	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
-
-	parse_analog_stick_config(dev, "MapAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL], "left analog stick");
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick [ir mode]");
-
-	parse_analog_stick_config(dev, "MapAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "right analog stick");
-	parse_analog_stick_config(dev, "MapIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "right analog stick [ir mode]");
+	parse_analog_stick_config(dev, "MapClassicAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "right analog stick");
+	parse_analog_stick_config(dev, "MapClassicIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "right analog stick [ir mode]");
 }
 
 static void xwiimote_configure_keys(struct xwiimote_dev *dev)
