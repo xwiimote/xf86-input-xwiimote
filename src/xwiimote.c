@@ -59,6 +59,7 @@
 #define XWIIMOTE_IR_CONTINUOUS_SCROLL_MAX_Y 10
 #define XWIIMOTE_IR_MAX_Y 767
 #define XWIIMOTE_IR_MAX_X 1023
+#define XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE 1.0
 
 #define XWIIMOTE_IR_KEYMAP_EXPIRY_SECS 1
 
@@ -419,8 +420,8 @@ struct xwiimote_dev {
   double ir_continuous_scroll_subpixel_x;
   double ir_continuous_scroll_subpixel_y;
 
-  int ir_smooth_scroll_x;
-  int ir_smooth_scroll_y;
+  double ir_smooth_scroll_x;
+  double ir_smooth_scroll_y;
 
 	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
 	int accel_history_cur;
@@ -835,15 +836,6 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
       abs_x = XWIIMOTE_IR_MAX_X - dev->ir_continuous_scroll_border;
     }
 
-    /* Moves cursor smoothly to the point pointed at */
-    if (dev->ir_smooth_scroll_x < 0) {
-      dev->ir_smooth_scroll_x = abs_x;
-    } else if (abs_x > dev->ir_smooth_scroll_x) {
-      dev->ir_smooth_scroll_x += 1;
-    } else if (abs_x < dev->ir_smooth_scroll_x) {
-      dev->ir_smooth_scroll_x -= 1;
-    }
-
     /* Calculate the absolute y value */
     abs_y = a->y;
     if (abs_y < dev->ir_continuous_scroll_border) {
@@ -852,16 +844,36 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
       abs_y = XWIIMOTE_IR_MAX_Y - dev->ir_continuous_scroll_border;
     }
 
-    /* Moves cursor smoothly to the point pointed at */
-    if (dev->ir_smooth_scroll_y < 0) {
-      dev->ir_smooth_scroll_y = abs_y;
-    } else if (abs_y > dev->ir_smooth_scroll_y) {
-      dev->ir_smooth_scroll_y += 1;
-    } else if (abs_y < dev->ir_smooth_scroll_y) {
-      dev->ir_smooth_scroll_y -= 1;
+    /* Moves cursor smoothly to the point pointed at with a transition */
+    {
+      double actual_distance;
+      double angle;
+
+      actual_distance = abs(sqrt(pow(abs_x, 2) + pow(abs_y, 2)));
+
+      if (actual_distance < XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE) {
+          dev->ir_smooth_scroll_x = abs_x;
+          dev->ir_smooth_scroll_y = abs_y;
+      }
+      else {
+        if (abs_x != 0 && abs_y != 0) {
+          angle = atan(abs_y/abs_x);
+          dev->ir_smooth_scroll_x += sin(angle) * XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE;
+          dev->ir_smooth_scroll_y += cos(angle) * XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE;
+        } else if (abs_x != 0) {
+          dev->ir_smooth_scroll_x += XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE;
+          dev->ir_smooth_scroll_y = 0;
+        } else if (abs_y != 0) {
+          dev->ir_smooth_scroll_x = 0;
+          dev->ir_smooth_scroll_y += XWIIMOTE_IR_SMOOTH_SCROLL_DISTANCE;
+        } else {
+          dev->ir_smooth_scroll_x = 0;
+          dev->ir_smooth_scroll_y = 0;
+        }
+      }
     }
 
-    xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, dev->ir_smooth_scroll_x, dev->ir_smooth_scroll_y);
+    xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, (int) dev->ir_smooth_scroll_x, (int) dev->ir_smooth_scroll_y);
   }
 
   /* Continuous scrolling at the edges of the screen */
