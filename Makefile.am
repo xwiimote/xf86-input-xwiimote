@@ -40,4 +40,5 @@ AM_CFLAGS = $(XORG_CFLAGS) $(SYSDEP_CFLAGS) -Wno-redundant-decls -Wno-cast-qual
 @DRIVER_NAME@_drv_la_LDFLAGS = -module -avoid-version
 @DRIVER_NAME@_drv_la_LIBADD = $(SYSDEP_LIBS)
 @DRIVER_NAME@_drv_ladir = @inputdir@
-@DRIVER_NAME@_drv_la_SOURCES = src/@DRIVER_NAME@.c
+#@DRIVER_NAME@_drv_la_SOURCES = src/@DRIVER_NAME@
+@DRIVER_NAME@_drv_la_SOURCES = src/analog-stick-axis.c src/analog-stick.c src/nunchuk.c src/wiimote.c src/ir.c src/accelerometer.c src/motionplus.c

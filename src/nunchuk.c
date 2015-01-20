@@ -1,0 +1,73 @@
+/*
+ * XWiimote
+ *
+ * Copyright (c) 2011-2013 David Herrmann <dh.herrmann@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files
+ * (the "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <xorg-server.h>
+#include <inttypes.h>
+#include <stdlib.h>
+#include <math.h>
+#include <xf86.h>
+
+#include "nunchuk.h"
+
+
+void handle_nunchuk_analog_stick(struct nunchuk *nunchuk,
+                                 struct nunchuk_config *config,
+                                 struct xwii_event *ev,
+                                 unsigned int state,
+                                 InputInfoPtr info)
+{
+  handle_analog_stick(&nunchuk->analog_stick, &config->analog_stick, ev, 0, state, info);
+}
+
+
+void handle_nunchuk_key(struct nunchuk *nunchuk,
+                        struct nunchuk_config *config,
+                        struct xwii_event *ev,
+                        unsigned int state,
+                        InputInfoPtr info)
+{  
+  unsigned int keycode;
+
+  keycode = ev->v.key.code;
+
+  if (keycode > -1 && keycode < NUNCHUK_KEY_NUM) {
+    handle_key(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
+  } else {
+    xf86IDrvMsg(info, X_ERROR, "Invalid nunchuk button %d\n", keycode);
+  }
+}
+
+/*TODO
+static void nunchuk_refresh(struct xwiimote_dev *dev)
+{
+	if (xwii_iface_available(dev->iface) & XWII_IFACE_NUNCHUK) {
+		xwii_iface_open(dev->iface, XWII_IFACE_NUNCHUK);
+	}
+}
+*/
