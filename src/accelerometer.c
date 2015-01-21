@@ -66,3 +66,11 @@ void handle_accelerometer(struct accelerometer *accelerometer,
 
 	xf86PostMotionEvent(info->dev, 1, 0, 2, x, y);
 }
+
+
+void configure_accelerometer(struct accelerometer_config *config, 
+                  char const *name,
+                  InputInfoPtr info)
+{
+/*TODO*/
+}

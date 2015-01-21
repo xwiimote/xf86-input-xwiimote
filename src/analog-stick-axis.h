@@ -20,6 +20,7 @@ struct analog_stick_axis {
 	double subpixel; /*for ANALOG_STICK_MOTION_TYPE_RELATIVE*/
   struct key high;
   struct key low;
+  unsigned int state;
 };
 
 struct analog_stick_axis_config {
@@ -31,7 +32,7 @@ struct analog_stick_axis_config {
 	double amplify;
 };
 
-void configure_analog_stick_axis(struct analog_stick_axis_config *config, char const *name, char const *value, InputInfoPtr info);
+void configure_analog_stick_axis(struct analog_stick_axis_config *config, char const *option_key, InputInfoPtr info);
 void handle_analog_stick_axis(struct analog_stick_axis *axis, struct analog_stick_axis_config *config, int32_t value, int state, InputInfoPtr info, int first_valuator);
 
 #endif

@@ -75,186 +75,10 @@ static int analog_stick_map_y_to_circle(int x, int y) {
     return analog_stick_map_x_to_circle(y, x);
 }
 
-
-/*
-static struct analog_stick_func map_analog_stick_nunchuk_default[KEYSET_NUM] = {
-	[KEYSET_NORMAL] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-
-	[KEYSET_IR] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-};
-
-static struct analog_stick_func map_analog_stick_left_default[KEYSET_NUM] = {
-	[KEYSET_NORMAL] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-
-	[KEYSET_IR] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-};
-
-static struct analog_stick_func map_analog_stick_right_default[KEYSET_NUM] = {
-	[KEYSET_NORMAL] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_RELATIVE,
-			.map_high = {
-				.type = FUNC_IGNORE,
-			},
-			.map_low = {
-				.type = FUNC_IGNORE,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_RELATIVE,
-			.map_high = {
-				.type = FUNC_IGNORE,
-			},
-			.map_low = {
-				.type = FUNC_IGNORE,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-	[KEYSET_IR] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_RELATIVE,
-			.map_high = {
-				.type = FUNC_IGNORE,
-			},
-			.map_low = {
-				.type = FUNC_IGNORE,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_RELATIVE,
-			.map_high = {
-				.type = FUNC_IGNORE,
-			},
-			.map_low = {
-				.type = FUNC_IGNORE,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-};
-*/
-
-
 void configure_analog_stick(struct analog_stick_config *config,
                             char const *name,
                             InputInfoPtr info)
 {
-	const char *value;
 	char axis_name[100];
   int i;
 
@@ -268,17 +92,14 @@ void configure_analog_stick(struct analog_stick_config *config,
 	if (!name)
 		return;
 
-	if (snprintf(axis_name, 100, "%sX", name) < 100) {
-		value = xf86FindOptionValue(info->options, axis_name);
-		configure_analog_stick_axis (&config->x, name, value, info);
+	if (snprintf(axis_name, 100, "%sAnalogStickAxisX", name) < 100) {
+		configure_analog_stick_axis (&config->x, axis_name, info);
 	}
 
-	if (snprintf(axis_name, 100, "%sY", name) < 100) {
-		value = xf86FindOptionValue(info->options, axis_name);
-		configure_analog_stick_axis (&config->y, name, value, info);
+	if (snprintf(axis_name, 100, "%sAnalogStickAxisY", name) < 100) {
+		configure_analog_stick_axis (&config->y, axis_name, info);
 	}
 }
-
 
 void handle_analog_stick(struct analog_stick *stick,
                          struct analog_stick_config *config,
@@ -313,4 +134,13 @@ void handle_analog_stick(struct analog_stick *stick,
 
 	handle_analog_stick_axis(&stick->x, &config->x, mapped_x, state, info, 0);		
 	handle_analog_stick_axis(&stick->y, &config->y, mapped_y, state, info, 1);	   
+
+  /* Give easy access to the state */
+  if (stick->x.state) {
+    stick->state = stick->x.state;
+  } else if (stick->y.state) {
+    stick->state = stick->y.state;
+  } else {
+    stick->state = 0;
+  }
 }

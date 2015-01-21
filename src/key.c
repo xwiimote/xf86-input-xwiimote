@@ -26,110 +26,71 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#include <xorg-server.h>
+#include <inttypes.h>
 #include <stdlib.h>
+#include <math.h>
+#include <xf86.h>
 
 #include "key.h"
 
 
-void press_key(struct key *key,
-               struct key_config *config,
-               InputInfoPtr info) {
-	unsigned int key;
+static void press_key(struct key *key,
+                      struct key_config *config,
+                      unsigned int state,
+                      InputInfoPtr info) {
+	unsigned int code;
 	int btn;
 
 	switch (config->type) {
 		case FUNC_BTN:
 			btn = config->u.btn;
-			xf86PostButtonEvent(info->dev, 0, btn,
-								1, 0, 0);
-      key->state = state;
+			xf86PostButtonEvent(info->dev, 0, btn, 1, 0, 0);
 			break;
 		case FUNC_KEY:
-			key = config->u.key + MIN_KEYCODE;
-			xf86PostKeyboardEvent(info->dev, key, 1);
-      key->state = state;
+			code = config->u.key + MIN_KEYCODE;
+			xf86PostKeyboardEvent(info->dev, code, 1);
 			break;
 		case FUNC_IGNORE:
 		default:
 			break;
 	}
+  key->state = state;
 }
 
-void depress_key(struct key *key,
-                 struct key_config *config,
-                 InputInfoPtr info) {
-	unsigned int key;
+static void depress_key(struct key *key,
+                        struct key_config *config,
+                        InputInfoPtr info) {
+	unsigned int code;
 	int btn;
 
 	switch (config->type) {
 		case FUNC_BTN:
 			btn = config->u.btn;
 			xf86PostButtonEvent(info->dev, 0, btn,	0, 0, 0);
-      key->state = state;
 			break;
 		case FUNC_KEY:
-			key = config->u.key + MIN_KEYCODE;
-			xf86PostKeyboardEvent(info->dev, key, 0);
-      key->state = state;
+			code = config->u.key + MIN_KEYCODE;
+			xf86PostKeyboardEvent(info->dev, code, 0);
 			break;
 		case FUNC_IGNORE:
 		default:
 			break;
 	}
+  key->state = KEY_STATE_RELEASED;
 }
 
 void handle_key(struct key *key,
                struct key_config *config,
-               int state,
+               unsigned int state,
                InputInfoPtr info) {
   if (state && !key->state) {
-    press_key(key, config, state, info, 0)
+    press_key(key, config, state, info);
   } else if (!state && key->state) {
-    depress_key(key, config, state, info, 0)
+    depress_key(key, config, info);
   }
 }
-
-void configure_key(struct key_config *config,
-                   char const *name,
-                   char const *value,
-                   InputInfoPtr info)
-{
-	unsigned int i;
-
-	if (!value)
-		return;
-
-	if (!strcasecmp(value, "none") ||
-			!strcasecmp(value, "off") ||
-			!strcasecmp(value, "0") ||
-			!strcasecmp(value, "false")) {
-		config->type = FUNC_IGNORE;
-	} else if (!strcasecmp(value, "left-button")) {
-		config->type = FUNC_BTN;
-		config->u.btn = 1;
-	} else if (!strcasecmp(value, "right-button")) {
-		config->type = FUNC_BTN;
-		config->u.btn = 3;
-	} else if (!strcasecmp(value, "middle-button")) {
-		config->type = FUNC_BTN;
-		config->u.btn = 2;
-	} else {
-		for (i = 0; key2value[i].value; ++i) {
-			if (!strcasecmp(key2value[i].value, value))
-				break;
-		}
-
-		if (key2value[i].value) {
-			config->type = FUNC_KEY;
-			config->u.value = key2value[i].value;
-		} else {
-			xf86IDrvMsg(dev->info, X_ERROR,
-						"Invalid value option %s\n", value);
-			config->type = FUNC_IGNORE;
-		}
-	}
-}
-
 
 static struct key_value_pair {
 	const char *key;
@@ -640,4 +601,53 @@ static struct key_value_pair {
 	{ NULL, 0 },
 };
 
+void configure_key_by_value(struct key_config *config,
+                            char const *name,
+                            char const *value,
+                            InputInfoPtr info)
+{
+  int i;
 
+	if (!strcasecmp(value, "none") ||
+			!strcasecmp(value, "off") ||
+			!strcasecmp(value, "0") ||
+			!strcasecmp(value, "false")) {
+		config->type = FUNC_IGNORE;
+	} else if (!strcasecmp(value, "left-button")) {
+		config->type = FUNC_BTN;
+		config->u.btn = 1;
+	} else if (!strcasecmp(value, "right-button")) {
+		config->type = FUNC_BTN;
+		config->u.btn = 3;
+	} else if (!strcasecmp(value, "middle-button")) {
+		config->type = FUNC_BTN;
+		config->u.btn = 2;
+	} else {
+		for (i = 0; key2value[i].key; ++i) {
+			if (!strcasecmp(key2value[i].key, value))
+				break;
+		}
+
+		if (key2value[i].value) {
+			config->type = FUNC_KEY;
+			config->u.key = key2value[i].value;
+		} else {
+			xf86IDrvMsg(info, X_ERROR, "%s is an invalid key value for %s\n", value, name);
+			config->type = FUNC_IGNORE;
+		}
+	}
+}
+
+void configure_key(struct key_config *config,
+                   char const *option_key,
+                   InputInfoPtr info)
+{
+  char const *value;
+
+	value = xf86FindOptionValue(info->options, option_key);
+
+	if (!value)
+		return;
+
+  configure_key_by_value(config, option_key, value, info);
+}

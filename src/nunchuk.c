@@ -63,6 +63,32 @@ void handle_nunchuk_key(struct nunchuk *nunchuk,
   }
 }
 
+void configure_nunchuk(struct nunchuk_config *config,
+                       char const * prefix,
+                       struct nunchuk_config *defaults,
+                       InputInfoPtr info)
+{
+  char option_key[100];
+  char analog_stick_prefix[100];
+
+	memset(config, 0, sizeof(struct nunchuk_config));
+
+  if (defaults) {
+	  memcpy(config, defaults, sizeof(struct nunchuk_config));
+  }
+
+  /* AnalogStick */
+  snprintf(analog_stick_prefix, sizeof(analog_stick_prefix), "%sNunchuk", prefix);
+	configure_analog_stick(&config->analog_stick, analog_stick_prefix, info);
+
+  /* Keys */
+  snprintf(option_key, sizeof(option_key), "%sC", prefix);
+	configure_key(&config->keys[NUNCHUK_KEY_C], option_key, info);
+
+  snprintf(option_key, sizeof(option_key), "%sZ", prefix);
+	configure_key(&config->keys[NUNCHUK_KEY_Z], option_key, info);
+}
+
 /*TODO
 static void nunchuk_refresh(struct xwiimote_dev *dev)
 {

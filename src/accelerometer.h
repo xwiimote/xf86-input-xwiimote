@@ -19,6 +19,7 @@ struct accelerometer_config {
 
 
 void handle_accelerometer(struct accelerometer *accelerometer, struct accelerometer_config *config, struct xwii_event *ev, InputInfoPtr info);
+void configure_accelerometer(struct accelerometer_config *config, char const *name, InputInfoPtr info);
 
 #endif
 

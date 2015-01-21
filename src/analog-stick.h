@@ -16,6 +16,7 @@ enum analog_stick_shape {
 struct analog_stick {
 	struct analog_stick_axis x;
 	struct analog_stick_axis y;
+  unsigned int state;
 };
 
 struct analog_stick_config {

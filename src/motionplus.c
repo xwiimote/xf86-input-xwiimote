@@ -102,15 +102,18 @@ static void parse_scale(const char *t, int *out)
 
 
 void configure_motionplus(struct motionplus_config *config,
+                          char const *prefix,
                           InputInfoPtr info)
 {
 	const char *normalize, *factor, *t;
 	int x, y, z, fac;
+  char option_key[100];
 
 	/* TODO: Allow modifying x, y, z and factor via xinput-properties for
 	 * run-time calibration. */
-
-	factor = xf86FindOptionValue(info->options, "MPCalibrationFactor");
+  
+  snprintf(option_key, sizeof(option_key), "%sCalibrationFactor", prefix);
+	factor = xf86FindOptionValue(info->options, option_key);
 	if (!factor)
 		factor = "";
 
@@ -121,7 +124,8 @@ void configure_motionplus(struct motionplus_config *config,
 	else if (sscanf(factor, "%i", &fac) != 1)
 		fac = 0;
 
-	normalize = xf86FindOptionValue(info->options, "MPNormalization");
+  snprintf(option_key, sizeof(option_key), "%sNormalization", prefix);
+	normalize = xf86FindOptionValue(info->options, option_key);
 	if (!normalize)
 		normalize = "";
 
@@ -131,28 +135,39 @@ void configure_motionplus(struct motionplus_config *config,
 /*TODO
 		xwii_iface_set_normalization(dev->iface, 0, 0, 0, fac);
 		xf86IDrvMsg(info, X_INFO,
-				"MP-Normalizer started with (0:0:0) * %i\n", fac);
+				"-Normalizer started with (0:0:0) * %i\n", fac);
 */
 	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
 /*TODO
 		xwii_iface_set_normalization(dev->iface, x, y, z, fac);
 		xf86IDrvMsg(info, X_INFO,
-				"MP-Normalizer started with (%i:%i:%i) * %i\n",
+				"-Normalizer started with (%i:%i:%i) * %i\n",
 				x, y, z, fac);
 */
 	}
 
-	t = xf86FindOptionValue(info->options, "MPXAxis");
+  snprintf(option_key, sizeof(option_key), "%sXAxis", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_axis(t, &config->x);
-	t = xf86FindOptionValue(info->options, "MPXScale");
+
+  snprintf(option_key, sizeof(option_key), "%sXScale", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->x_scale);
-	t = xf86FindOptionValue(info->options, "MPYAxis");
+
+  snprintf(option_key, sizeof(option_key), "%sYAxis", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_axis(t, &config->y);
-	t = xf86FindOptionValue(info->options, "MPYScale");
+
+  snprintf(option_key, sizeof(option_key), "%sYScale", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->y_scale);
-	t = xf86FindOptionValue(info->options, "MPZAxis");
+
+  snprintf(option_key, sizeof(option_key), "%sZAxis", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_axis(t, &config->z);
-	t = xf86FindOptionValue(info->options, "MPZScale");
+
+  snprintf(option_key, sizeof(option_key), "%sZScale", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->z_scale);
 }
 

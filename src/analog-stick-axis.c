@@ -68,27 +68,21 @@ static void print_analog_stick_config (struct analog_stick_axis_config *config, 
 }
 
 void configure_analog_stick_axis(struct analog_stick_axis_config *config,
-                                 char const *name,
-                                 char const *value,
+                                 char const *option_key,
                                  InputInfoPtr info)
 {
-	char const *c = value;
+	char const *c;
 	char v[40];
 	int i;
 	double d;
   char key_name[100];
+  char const *value;
 
+	value = xf86FindOptionValue(info->options, option_key);
 	if (!value)
 		return;
 
-  if (name) {
-    i = 0;
-    while (name[i] != '\0' && i < sizeof(config->name) - 1) {
-      config->name[i] = name[i];
-      i++;
-    }
-    config->name[i] = '\0';
-  }
+	c = value;
 
 	while (*c != '\0') {
 		/* Skip any possible whitespace */
@@ -102,25 +96,25 @@ void configure_analog_stick_axis(struct analog_stick_axis_config *config,
 			} else if (strcmp(v, "none") == 0) {
 				config->mode = ANALOG_STICK_AXIS_MODE_NONE;
 			} else {
-				xf86Msg(X_WARNING, "%s: error parsing mode. value: %s\n", config->name, v);
+				xf86Msg(X_WARNING, "%s: error parsing mode. value: %s\n", option_key, v);
 			}
 		} else if (sscanf(c, "keylow=%40s", v)) {
-      snprintf(key_name, sizeof(key_name), "%s low", config->name);
-			configure_key(&config->low, key_name, v, info);
+      snprintf(key_name, sizeof(key_name), "%s low", option_key);
+			configure_key_by_value(&config->low, key_name, v, info);
 		} else if (sscanf(c, "keyhigh=%40s", v)) {
-      snprintf(key_name, sizeof(key_name), "%s high", config->name);
-			configure_key(&config->high, key_name, v, info);
+      snprintf(key_name, sizeof(key_name), "%s high", option_key);
+			configure_key_by_value(&config->high, key_name, v, info);
 		} else if (sscanf(c, "deadzone=%i", &i)) {
 			if (i > 1 && i < 100) {
 				config->deadzone = i;
 			} else {
-				xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", config->name, i);
+				xf86Msg(X_WARNING, "%s: error parsing deadzone. value: %d\n", option_key, i);
 			}
 		} else if (sscanf(c, "amplify=%lf", &d)) {
 			if (d >= 0.0  && d < 10.0) {
 				config->amplify = d;
 			} else {
-				xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", config->name, d);
+				xf86Msg(X_WARNING, "%s: error parsing amplify. value: %f\n", option_key, d);
 			}
 		}
 
@@ -193,6 +187,15 @@ void handle_analog_stick_axis(struct analog_stick_axis *axis,
   /* Handle pointer motion */
   if (config->mode != ANALOG_STICK_AXIS_MODE_NONE) {
     xf86PostMotionEvent(info->dev, 0, first_valuator, 2 - first_valuator, axis->delta);
+  }
+
+  /* Give easy access to the state */
+  if (axis->low.state) {
+    axis->state = axis->low.state;
+  }  else if (axis->high.state) {
+    axis->state = axis->high.state;
+  } else {
+    axis->state = 0;
   }
 
 	axis->previous_value = value;

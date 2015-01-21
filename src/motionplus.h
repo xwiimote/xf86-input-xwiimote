@@ -17,7 +17,7 @@ struct motionplus_config {
 };
 
 void preinit_motionplus(struct motionplus_config *config);
-void configure_motionplus(struct motionplus_config *config, InputInfoPtr info);
+void configure_motionplus(struct motionplus_config *config, char const *prefix, InputInfoPtr info);
 void handle_motionplus(struct motionplus *motionplus, struct motionplus_config *config, struct xwii_event *ev, InputInfoPtr info);
 
 #endif

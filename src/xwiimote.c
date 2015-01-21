@@ -45,42 +45,11 @@
 #include <xserver-properties.h>
 #include <xwiimote.h>
 
+#include "wiimote.h"
 #include "nunchuk.h"
 
 static char xwiimote_name[] = "xwiimote";
 
-
-
-static struct func map_key_default[XWII_KEY_NUM] = {
-	/* Wiimote */
-	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
-	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
-	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
-	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
-	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
-	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
-
-	/* Nunchuck */
-	[XWII_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
-	[XWII_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
-
-	/*Classic Controller*/
-	[XWII_KEY_X] =  { .type = FUNC_KEY, .u.key = KEY_RIGHTSHIFT },
-	[XWII_KEY_Y] =  { .type = FUNC_KEY, .u.key = KEY_RIGHTCTRL },
-	[XWII_KEY_TL] = { .type = FUNC_KEY, .u.key = KEY_PAGEUP },
-	[XWII_KEY_TR] = { .type = FUNC_KEY, .u.key = KEY_PAGEDOWN },
-	[XWII_KEY_ZL] = { .type = FUNC_KEY, .u.key = KEY_HOME },
-	[XWII_KEY_ZR] = { .type = FUNC_KEY, .u.key = KEY_END },
-
-	/* Pro Controller*/
-	[XWII_KEY_THUMBL] =  { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
-	[XWII_KEY_THUMBR] =  { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
-};
 
 enum motion_type {
 	MOTION_NONE,
@@ -88,18 +57,11 @@ enum motion_type {
 	MOTION_REL,
 };
 
-
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
 	SOURCE_IR,
 	SOURCE_MOTIONPLUS,
-};
-
-enum keyset {
-	KEYSET_NORMAL,
-	KEYSET_IR,
-	KEYSET_NUM
 };
 
 struct xwiimote_dev {
@@ -111,16 +73,17 @@ struct xwiimote_dev {
 	bool dup;
 	struct xwii_iface *iface;
 	unsigned int ifs;
+  enum key_state motion_key_state;
 
 	XkbRMLVOSet rmlvo;
 	unsigned int motion;
 	unsigned int motion_source;
-	enum keyset key_pressed[XWII_KEY_NUM];
+	enum key_state key_pressed[XWII_KEY_NUM];
 
   struct wiimote wiimote;
-  struct wiimote_config wiimote_config[KEYSET_NUM];
+  struct wiimote_config wiimote_config[KEY_STATE_NUM];
   struct nunchuk nunchuk;
-  struct nunchuk_config nunchuk_config[KEYSET_NUM];
+  struct nunchuk_config nunchuk_config[KEY_STATE_NUM];
 };
 
 /* List of all devices we know about to avoid duplicates */
@@ -326,8 +289,8 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
       break;
     case SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device, 
-        XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER, XWIIMOTE_IR_MAX_X - XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER,
-        XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER, XWIIMOTE_IR_MAX_Y - XWIIMOTE_IR_CONTINUOUS_SCROLL_BORDER);
+        IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
+        IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
       break;
     default:
       ret = Success;
@@ -352,6 +315,14 @@ static void xwiimote_input(int fd, pointer data)
 	struct xwii_event ev;
 	int ret;
 
+  struct wiimote *wiimote = &dev->wiimote;
+  struct nunchuk *nunchuk = &dev->nunchuk;
+
+  struct wiimote_config *wiimote_config;
+  struct nunchuk_config *nunchuk_config;
+  unsigned int state;
+  BOOL ir_is_active;
+
 	dev = info->private;
 	if (dev->dup)
 		return;
@@ -362,39 +333,82 @@ static void xwiimote_input(int fd, pointer data)
 		if (ret)
 			break;
 
-    if (ir_is_active (ir_config, &ev)) {
-      state =  KEYSET_IR;
+    ir_is_active = wiimote_ir_is_active (wiimote, &dev->wiimote_config[dev->motion_key_state], &ev);
+    if (ir_is_active) {
+      dev->motion_key_state = KEY_STATE_PRESSED_WITH_IR;
     } else {
-      state = 0;
+      dev->motion_key_state = KEY_STATE_PRESSED;
     }
 
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
+/*TODO
 				refresh_wiimote(dev);
 				refresh_nunchuk(dev);
+*/
+
 				break;
 			case XWII_EVENT_KEY:
+        state = wiimote->keys[ev.v.key.code].state;
+        if (!state) {
+          state = ev.v.key.state;
+          if (state) {
+            if (ir_is_active) {
+              state = KEY_STATE_PRESSED_WITH_IR;
+            } else {
+              state = KEY_STATE_PRESSED;
+            }
+          }
+        }
+        wiimote_config = &dev->wiimote_config[state];
 				handle_wiimote_key(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_ACCEL:
 	      if (dev->motion_source == SOURCE_ACCEL) {
+          state = dev->motion_key_state;
+          wiimote_config = &dev->wiimote_config[state];
 				  handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, dev->info);
         }
 				break;
 			case XWII_EVENT_IR:
 	      if (dev->motion_source == SOURCE_IR) {
+          state = dev->motion_key_state;
+          wiimote_config = &dev->wiimote_config[state];
 				  handle_wiimote_ir(wiimote, wiimote_config, &ev, state, dev->info);
         }
 			case XWII_EVENT_MOTION_PLUS:
 	      if (dev->motion_source == SOURCE_MOTIONPLUS) {
+          state = dev->motion_key_state;
+          wiimote_config = &dev->wiimote_config[state];
 				  handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, dev->info);
         }
 				break;
 			case XWII_EVENT_NUNCHUK_KEY:
-				handle_nunchuk_key(nunchuk, nunchuck_config, &info, &ev, state, dev->info);
+        state = nunchuk->keys[ev.v.key.code].state;
+        if (!state) {
+          state = ev.v.key.state;
+          if (state) {
+            if (ir_is_active) {
+              state = KEY_STATE_PRESSED_WITH_IR;
+            } else {
+              state = KEY_STATE_PRESSED;
+            }
+          }
+        }
+        nunchuk_config = &dev->nunchuk_config[state];
+				handle_nunchuk_key(nunchuk, nunchuk_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_NUNCHUK_MOVE:
-				handle_nunchuk_analog_stick(nunchuk, nunchuck_config, &info, &ev, state, dev->info);
+        state = nunchuk->analog_stick.state;
+        if (!state) {
+          if (ir_is_active) {
+            state = KEY_STATE_PRESSED_WITH_IR;
+          } else {
+            state = KEY_STATE_PRESSED;
+          }
+        }
+        nunchuk_config = &dev->nunchuk_config[state];
+				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, dev->info);
 				break;
 		}
 	} while (!ret);
@@ -555,187 +569,39 @@ err_udev:
 }
 
 
-static void xwiimote_configure_analog_sticks(struct xwiimote_dev *dev)
-{
-	memcpy(dev->map_analog_stick[ANALOG_STICK_NUNCHUK], map_analog_stick_nunchuk_default, sizeof(map_analog_stick_nunchuk_default));
-	parse_analog_stick_config(dev, "MapNunchukAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_NUNCHUK][KEYSET_NORMAL], "nunchuk analog stick");
-	parse_analog_stick_config(dev, "MapNunchukIRAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_NUNCHUK][KEYSET_IR], "nunchuk analog stick [ir mode]");
+static struct wiimote_config wiimote_defaults[KEY_STATE_NUM] = {
+/*
+	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
+	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
+	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
+	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+*/
+};
 
-	memcpy(dev->map_analog_stick[ANALOG_STICK_LEFT], map_analog_stick_left_default, sizeof(map_analog_stick_left_default));
-	parse_analog_stick_config(dev, "MapClassicAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_NORMAL], "left analog stick");
-	parse_analog_stick_config(dev, "MapIRClassicAnalogStickAxis", &dev->map_analog_stick[ANALOG_STICK_LEFT][KEYSET_IR], "left analog stick [ir mode]");
 
-	memcpy(dev->map_analog_stick[ANALOG_STICK_RIGHT], map_analog_stick_right_default, sizeof(map_analog_stick_right_default));
-	parse_analog_stick_config(dev, "MapClassicAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_NORMAL], "right analog stick");
-	parse_analog_stick_config(dev, "MapClassicIRAnalogStickAxisZ", &dev->map_analog_stick[ANALOG_STICK_RIGHT][KEYSET_IR], "right analog stick [ir mode]");
-}
+static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
+/*
+	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
+	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
+	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
+	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+*/
+};
 
-
-static void xwiimote_configure_keys(struct xwiimote_dev *dev)
-{
-	const char *motion, *key;
-
-	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
-	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
-
-	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
-	if (!motion)
-		motion = "";
-
-	if (!strcasecmp(motion, "accelerometer")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_ACCEL;
-		dev->ifs |= XWII_IFACE_ACCEL;
-	} else if (!strcasecmp(motion, "ir")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_IR;
-		dev->ifs |= XWII_IFACE_IR;
-	} else if (!strcasecmp(motion, "motionplus")) {
-		dev->motion = MOTION_REL;
-		dev->motion_source = SOURCE_MOTIONPLUS;
-		dev->ifs |= XWII_IFACE_MOTION_PLUS;
-	}
-
-	key = xf86FindOptionValue(dev->info->options, "MapLeft");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_LEFT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapRight");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_RIGHT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapUp");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_UP]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapDown");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_DOWN]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapA");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_A]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapB");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_B]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapPlus");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_PLUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapMinus");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_MINUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapHome");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_HOME]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapOne");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ONE]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapTwo");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TWO]);
-
-	/* Nunchuk */
-
-	key = xf86FindOptionValue(dev->info->options, "MapC");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_C]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapZ");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_Z]);
-
-	/* Classic Controller and Pro Controller */
-
-	key = xf86FindOptionValue(dev->info->options, "MapX");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_X]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapY");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_Y]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapTL");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapTR");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TR]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapZL");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ZL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapZR");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ZR]);
-
-   /* Pro Controller */
-
-	key = xf86FindOptionValue(dev->info->options, "MapTHUMBL");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_THUMBL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapTHUMBR");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_THUMBR]);
-
-	/* IR Mode */
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRLeft");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_LEFT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRRight");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_RIGHT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRUp");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_UP]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRDown");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_DOWN]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRA");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_A]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRB");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_B]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRPlus");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_PLUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRMinus");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_MINUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRHome");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_HOME]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIROne");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ONE]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTwo");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TWO]);
-
-	/* Nunchuk */
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRC");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_C]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRZ");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_Z]);
-
-	/* Classic Controller and Pro Controler */
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRX");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_X]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRY");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_Y]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTL");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTR");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TR]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRZL");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ZL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRZR");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ZR]);
-
-   /* Pro Controller */
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTHUMBL");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_THUMBL]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTHUMBR");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_THUMBR]);
-}
 
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 {
@@ -749,6 +615,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	memset(dev, 0, sizeof(*dev));
 	dev->info = info;
 	dev->dev_id = -1;
+  dev->motion_key_state = KEY_STATE_PRESSED;
 	info->private = dev;
 	info->type_name = (char*)XI_MOUSE;
 	info->device_control = xwiimote_control;
@@ -756,7 +623,8 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	info->switch_mode = NULL;
 	info->fd = -1;
 
-  wiimote_preinit(wiimote_config);
+  preinit_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED_WITH_IR]);
+  preinit_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED]);
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
@@ -788,10 +656,12 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 
 	xwiimote_add_dev(dev);
-	xwiimote_configure_keys(dev);
-	xwiimote_configure_analog_sticks(dev);
-	xwiimote_configure_mp(dev);
-	xwiimote_configure_ir(dev);
+
+  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED], "Map", wiimote_defaults, info);
+  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", wiimote_defaults, info);
+
+  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED], "Map", nunchuk_defaults, info);
+  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", nunchuk_defaults, info);
 
 	return Success;
 
@@ -874,3 +744,179 @@ _X_EXPORT XF86ModuleData xwiimoteModuleData =
 	&xwiimote_plug,
 	&xwiimote_unplug,
 };
+
+
+
+/* TODO
+static struct analog_stick_func map_analog_stick_nunchuk_default[KEY_STATE_NUM] = {
+	[KEY_STATE_PRESSED] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+
+	[KEY_STATE_PRESSED_WITH_IR] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+};
+
+static struct analog_stick_func map_analog_stick_left_default[KEY_STATE_NUM] = {
+	[KEY_STATE_PRESSED] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+
+	[KEY_STATE_PRESSED_WITH_IR] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_D,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_A,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_NONE,
+			.map_high = {
+				.type = FUNC_KEY,
+				.u.key = KEY_W,
+			},
+			.map_low = {
+				.type = FUNC_KEY,
+				.u.key = KEY_S,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+};
+
+static struct analog_stick_func map_analog_stick_right_default[KEY_STATE_NUM] = {
+	[KEY_STATE_PRESSED] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_RELATIVE,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_RELATIVE,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+	[KEY_STATE_PRESSED_WITH_IR] = {
+		.x = {
+			.mode = ANALOG_STICK_MODE_RELATIVE,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+		.y = {
+			.mode = ANALOG_STICK_MODE_RELATIVE,
+			.map_high = {
+				.type = FUNC_IGNORE,
+			},
+			.map_low = {
+				.type = FUNC_IGNORE,
+			},
+			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
+			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
+		},
+	},
+};
+*/
+

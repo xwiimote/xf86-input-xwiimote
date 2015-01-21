@@ -38,7 +38,9 @@ struct wiimote_config {
 };
 
 void preinit_wiimote(struct wiimote_config *config);
-void configure_wiimote(struct wiimote_config *config, InputInfoPtr info);
+void configure_wiimote(struct wiimote_config *config, char const * prefix, struct wiimote_config *defaults, InputInfoPtr info);
+
+BOOL wiimote_ir_is_active(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev);
 
 void handle_wiimote_key(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 void handle_wiimote_ir(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
