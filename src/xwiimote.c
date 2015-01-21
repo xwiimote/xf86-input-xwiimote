@@ -570,36 +570,109 @@ err_udev:
 
 
 static struct wiimote_config wiimote_defaults[KEY_STATE_NUM] = {
-/*
-	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
-	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
-	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
-	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
-	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
-	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
-*/
+  [KEY_STATE_PRESSED] = {
+    .keys = {
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+      [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+      [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+      [WIIMOTE_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
+      [WIIMOTE_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+      [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+      [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+    }
+  },
+  [KEY_STATE_PRESSED_WITH_IR] = {
+    .keys = {
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+      [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+      [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+      [WIIMOTE_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
+      [WIIMOTE_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+      [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+      [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+    }
+  }
 };
 
 
 static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
-/*
-	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
-	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
-	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
-	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
-	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
-	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
-*/
+	[KEY_STATE_PRESSED] = {
+    .analog_stick = {
+      .x = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_D,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_A,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+      .y = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_W,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_S,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+    },
+    .keys = {
+      [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+    }
+	},
+
+	[KEY_STATE_PRESSED_WITH_IR] = {
+    .analog_stick = {
+      .x = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_D,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_A,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+      .y = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_W,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_S,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+    },
+    .keys = {
+      [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+    }
+	},
 };
 
 
@@ -657,11 +730,11 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
 	xwiimote_add_dev(dev);
 
-  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED], "Map", wiimote_defaults, info);
-  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", wiimote_defaults, info);
+  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED], "Map", &wiimote_defaults[KEY_STATE_PRESSED], info);
+  configure_wiimote(&dev->wiimote_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", &wiimote_defaults[KEY_STATE_PRESSED_WITH_IR], info);
 
-  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED], "Map", nunchuk_defaults, info);
-  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", nunchuk_defaults, info);
+  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED], "Map", &nunchuk_defaults[KEY_STATE_PRESSED], info);
+  configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", &nunchuk_defaults[KEY_STATE_PRESSED_WITH_IR], info);
 
 	return Success;
 
@@ -748,66 +821,6 @@ _X_EXPORT XF86ModuleData xwiimoteModuleData =
 
 
 /* TODO
-static struct analog_stick_func map_analog_stick_nunchuk_default[KEY_STATE_NUM] = {
-	[KEY_STATE_PRESSED] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-
-	[KEY_STATE_PRESSED_WITH_IR] = {
-		.x = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_D,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_A,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-		.y = {
-			.mode = ANALOG_STICK_MODE_NONE,
-			.map_high = {
-				.type = FUNC_KEY,
-				.u.key = KEY_W,
-			},
-			.map_low = {
-				.type = FUNC_KEY,
-				.u.key = KEY_S,
-			},
-			.amplify = ANALOG_STICK_AMPLIFY_DEFAULT,
-			.deadzone = ANALOG_STICK_DEADZONE_DEFAULT,
-		},
-	},
-};
-
 static struct analog_stick_func map_analog_stick_left_default[KEY_STATE_NUM] = {
 	[KEY_STATE_PRESSED] = {
 		.x = {
