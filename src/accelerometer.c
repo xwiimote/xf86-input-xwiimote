@@ -69,8 +69,7 @@ void handle_accelerometer(struct accelerometer *accelerometer,
 
 
 void configure_accelerometer(struct accelerometer_config *config, 
-                  char const *name,
-                  InputInfoPtr info)
+                             char const *name,
+                             InputInfoPtr info)
 {
-/*TODO*/
 }

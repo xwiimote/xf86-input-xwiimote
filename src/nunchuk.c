@@ -88,12 +88,3 @@ void configure_nunchuk(struct nunchuk_config *config,
   snprintf(option_key, sizeof(option_key), "%sZ", prefix);
 	configure_key(&config->keys[NUNCHUK_KEY_Z], option_key, info);
 }
-
-/*TODO
-static void nunchuk_refresh(struct xwiimote_dev *dev)
-{
-	if (xwii_iface_available(dev->iface) & XWII_IFACE_NUNCHUK) {
-		xwii_iface_open(dev->iface, XWII_IFACE_NUNCHUK);
-	}
-}
-*/

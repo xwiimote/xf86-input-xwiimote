@@ -88,7 +88,7 @@ void handle_motionplus(struct motionplus *motionplus,
 
   x = get_axis(config, ev, 0) / 100;
   z = get_axis(config, ev, 2) / 100;
-  xf86PostMotionEvent(info->dev, 1, 0, 2, x, z);
+  xf86PostMotionEvent(info->dev, 0, 0, 2, x, z);
 }
 
 
@@ -120,9 +120,9 @@ void configure_motionplus(struct motionplus_config *config,
 	if (!strcasecmp(factor, "on") ||
 		!strcasecmp(factor, "true") ||
 		!strcasecmp(factor, "yes"))
-		fac = 50;
+		config->factor = 50;
 	else if (sscanf(factor, "%i", &fac) != 1)
-		fac = 0;
+		config->factor = 0;
 
   snprintf(option_key, sizeof(option_key), "%sNormalization", prefix);
 	normalize = xf86FindOptionValue(info->options, option_key);
@@ -132,18 +132,13 @@ void configure_motionplus(struct motionplus_config *config,
 	if (!strcasecmp(normalize, "on") ||
 		!strcasecmp(normalize, "true") ||
 		!strcasecmp(normalize, "yes")) {
-/*TODO
-		xwii_iface_set_normalization(dev->iface, 0, 0, 0, fac);
-		xf86IDrvMsg(info, X_INFO,
-				"-Normalizer started with (0:0:0) * %i\n", fac);
-*/
+    config->x_normalization = 0;
+    config->y_normalization = 0;
+    config->z_normalization = 0;
 	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
-/*TODO
-		xwii_iface_set_normalization(dev->iface, x, y, z, fac);
-		xf86IDrvMsg(info, X_INFO,
-				"-Normalizer started with (%i:%i:%i) * %i\n",
-				x, y, z, fac);
-*/
+    config->x_normalization = x;
+    config->y_normalization = y;
+    config->z_normalization = z;
 	}
 
   snprintf(option_key, sizeof(option_key), "%sXAxis", prefix);

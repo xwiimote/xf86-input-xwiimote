@@ -23,6 +23,14 @@ enum wiimote_key {
   WIIMOTE_KEY_NUM
 };
 
+
+enum wiimote_motion_source {
+  WIIMOTE_MOTION_SOURCE_IR,
+  WIIMOTE_MOTION_SOURCE_ACCELEROMETER,
+  WIIMOTE_MOTION_SOURCE_MOTIONPLUS,
+  WIIMOTE_MOTION_SOURCE_NUM
+};
+
 struct wiimote {
   struct key keys[WIIMOTE_KEY_NUM];
   struct ir ir;
@@ -31,6 +39,7 @@ struct wiimote {
 };
 
 struct wiimote_config {
+  unsigned int motion_source;
   struct key_config keys[WIIMOTE_KEY_NUM];
   struct ir_config ir;
   struct accelerometer_config accelerometer;

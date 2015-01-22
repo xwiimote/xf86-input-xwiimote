@@ -50,7 +50,7 @@ void handle_ir(struct ir *ir,
                struct xwii_event *ev,
                InputInfoPtr info)
 {
-	struct xwii_event_abs *a, *b, *c, d;
+	struct xwii_event_abs *a, *b, *c, d = {0};
 	int i, dists[6];
 
 	/* Grab first two valid points */

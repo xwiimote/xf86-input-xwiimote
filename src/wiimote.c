@@ -98,21 +98,13 @@ void configure_wiimote(struct wiimote_config *config,
 	if (!motion)
 		motion = "";
 
-/* TODO
 	if (!strcasecmp(motion, "accelerometer")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_ACCEL;
-		dev->ifs |= XWII_IFACE_ACCEL;
+		config->motion_source = WIIMOTE_MOTION_SOURCE_ACCELEROMETER;
 	} else if (!strcasecmp(motion, "ir")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_IR;
-		dev->ifs |= XWII_IFACE_IR;
+		config->motion_source = WIIMOTE_MOTION_SOURCE_IR;
 	} else if (!strcasecmp(motion, "motionplus")) {
-		dev->motion = MOTION_REL;
-		dev->motion_source = SOURCE_MOTIONPLUS;
-		dev->ifs |= XWII_IFACE_MOTION_PLUS;
+		config->motion_source = WIIMOTE_MOTION_SOURCE_MOTIONPLUS;
 	}
-*/
 
   configure_ir(&config->ir, prefix, info);
   configure_accelerometer(&config->accelerometer, prefix, info);
@@ -144,6 +136,7 @@ void handle_wiimote_ir(struct wiimote *wiimote,
                        unsigned int state,
                        InputInfoPtr info)
 {
+	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
   handle_ir(&wiimote->ir, &config->ir, ev, info);
 }
 
@@ -153,6 +146,7 @@ void handle_wiimote_motionplus(struct wiimote *wiimote,
                                unsigned int state,
                                InputInfoPtr info)
 {
+	if (config->motion_source != WIIMOTE_MOTION_SOURCE_MOTIONPLUS) return;
   handle_motionplus(&wiimote->motionplus, &config->motionplus, ev, info);
 }
 
@@ -162,20 +156,9 @@ void handle_wiimote_accelerometer(struct wiimote *wiimote,
                                   unsigned int state,
                                   InputInfoPtr info)
 {
+	if (config->motion_source != WIIMOTE_MOTION_SOURCE_ACCELEROMETER) return;
   handle_accelerometer(&wiimote->accelerometer, &config->accelerometer, ev, info);
 }
-
-
-/* TODO
-void refresh_wiimote(struct xwiimote_dev *dev)
-{
-	int ret;
-
-	ret = xwii_iface_open(dev->iface, dev->ifs);
-	if (ret)
-		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
-}
-*/
 
 
 void preinit_wiimote(struct wiimote_config *config) {

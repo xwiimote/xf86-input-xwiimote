@@ -77,7 +77,6 @@ struct xwiimote_dev {
 
 	XkbRMLVOSet rmlvo;
 	unsigned int motion;
-	unsigned int motion_source;
 	enum key_state key_pressed[XWII_KEY_NUM];
 
   struct wiimote wiimote;
@@ -271,6 +270,7 @@ err_out:
 static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+  struct wiimote_config *wiimote_config;
 
 	ret = xwiimote_prepare_key(dev, device);
 	if (ret != Success)
@@ -280,14 +280,20 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret != Success)
 		return ret;
 
-	switch(dev->motion_source) {
-    case SOURCE_ACCEL:
-      ret = xwiimote_prepare_abs(dev, device, -100, 100, -100, 100);
+  wiimote_config = &dev->wiimote_config[dev->motion_key_state];
+
+	switch(wiimote_config->motion_source) {
+    case WIIMOTE_MOTION_SOURCE_ACCELEROMETER:
+      ret = xwiimote_prepare_abs(dev, device,
+        ACCELEROMETER_MIN_X, ACCELEROMETER_MAX_X,
+        ACCELEROMETER_MIN_Y, ACCELEROMETER_MAX_Y);
       break;
-    case SOURCE_MOTIONPLUS:
-      ret = xwiimote_prepare_rel(dev, device, -10000, 10000, -10000, 10000);
+    case WIIMOTE_MOTION_SOURCE_MOTIONPLUS:
+      ret = xwiimote_prepare_rel(dev, device,
+        MOTIONPLUS_MIN_X, MOTIONPLUS_MAX_X,
+        MOTIONPLUS_MIN_Y, MOTIONPLUS_MAX_Y);
       break;
-    case SOURCE_IR:
+    case WIIMOTE_MOTION_SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device, 
         IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
         IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
@@ -342,11 +348,10 @@ static void xwiimote_input(int fd, pointer data)
 
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
-/*TODO
-				refresh_wiimote(dev);
-				refresh_nunchuk(dev);
-*/
-
+        if(!xwii_iface_open(dev->iface, dev->ifs))
+          xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
+        if (xwii_iface_available(dev->iface) & XWII_IFACE_NUNCHUK)
+          xwii_iface_open(dev->iface, XWII_IFACE_NUNCHUK);
 				break;
 			case XWII_EVENT_KEY:
         state = wiimote->keys[ev.v.key.code].state;
@@ -364,24 +369,18 @@ static void xwiimote_input(int fd, pointer data)
 				handle_wiimote_key(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_ACCEL:
-	      if (dev->motion_source == SOURCE_ACCEL) {
-          state = dev->motion_key_state;
-          wiimote_config = &dev->wiimote_config[state];
-				  handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, dev->info);
-        }
+        state = dev->motion_key_state;
+        wiimote_config = &dev->wiimote_config[state];
+				handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_IR:
-	      if (dev->motion_source == SOURCE_IR) {
-          state = dev->motion_key_state;
-          wiimote_config = &dev->wiimote_config[state];
-				  handle_wiimote_ir(wiimote, wiimote_config, &ev, state, dev->info);
-        }
+        state = dev->motion_key_state;
+        wiimote_config = &dev->wiimote_config[state];
+				handle_wiimote_ir(wiimote, wiimote_config, &ev, state, dev->info);
 			case XWII_EVENT_MOTION_PLUS:
-	      if (dev->motion_source == SOURCE_MOTIONPLUS) {
-          state = dev->motion_key_state;
-          wiimote_config = &dev->wiimote_config[state];
-				  handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, dev->info);
-        }
+        state = dev->motion_key_state;
+        wiimote_config = &dev->wiimote_config[state];
+				handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_NUNCHUK_KEY:
         state = nunchuk->keys[ev.v.key.code].state;
@@ -680,6 +679,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 {
 	struct xwiimote_dev *dev;
 	int ret;
+  struct motionplus_config *motionplus_config;
 
 	dev = malloc(sizeof(*dev));
 	if (!dev)
@@ -735,6 +735,18 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 
   configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED], "Map", &nunchuk_defaults[KEY_STATE_PRESSED], info);
   configure_nunchuk(&dev->nunchuk_config[KEY_STATE_PRESSED_WITH_IR], "MapIR", &nunchuk_defaults[KEY_STATE_PRESSED_WITH_IR], info);
+
+  motionplus_config = &dev->wiimote_config[KEY_STATE_PRESSED].motionplus;
+  xwii_iface_set_mp_normalization(dev->iface, 
+    motionplus_config->x_normalization, 
+    motionplus_config->y_normalization,
+    motionplus_config->z_normalization,
+    motionplus_config->factor);
+  xf86IDrvMsg(info, X_INFO, "-Normalizer started with (%i:%i:%i) * %i\n",
+    motionplus_config->x_normalization, 
+    motionplus_config->y_normalization,
+    motionplus_config->z_normalization,
+    motionplus_config->factor);
 
 	return Success;
 

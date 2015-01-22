@@ -4,6 +4,12 @@
 #include <xf86Xinput.h>
 #include <xwiimote.h>
 
+#define MOTIONPLUS_MAX_X 10000
+#define MOTIONPLUS_MIN_X -10000
+
+#define MOTIONPLUS_MAX_Y 10000
+#define MOTIONPLUS_MIN_Y -10000
+
 struct motionplus {
 };
 
@@ -14,6 +20,10 @@ struct motionplus_config {
 	int x_scale;
 	int y_scale;
 	int z_scale;
+  int x_normalization;
+  int y_normalization;
+  int z_normalization;
+  int factor;
 };
 
 void preinit_motionplus(struct motionplus_config *config);
