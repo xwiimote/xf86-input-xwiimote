@@ -50,13 +50,6 @@
 
 static char xwiimote_name[] = "xwiimote";
 
-enum motion_source {
-	SOURCE_NONE,
-	SOURCE_ACCEL,
-	SOURCE_IR,
-	SOURCE_MOTIONPLUS,
-};
-
 struct xwiimote_dev {
 	InputInfoPtr info;
 	void *handler;
@@ -561,6 +554,28 @@ err_udev:
 
 static struct wiimote_config wiimote_defaults[KEY_STATE_NUM] = {
   [KEY_STATE_PRESSED] = {
+    .motion_source = WIIMOTE_MOTION_SOURCE_NONE,
+    .ir = {
+      .avg_radius = IR_AVG_RADIUS,
+      .avg_max_samples = IR_AVG_MAX_SAMPLES,
+      .avg_min_samples = IR_AVG_MIN_SAMPLES,
+      .avg_weight = IR_AVG_WEIGHT,
+      .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
+      .continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER,
+      .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
+      .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
+    },
+    .accelerometer = {
+    },
+    .motionplus = {
+      .x = 0,
+      .y = 1,
+      .z = 2,
+      .x_scale = 1,
+      .y_scale = 1,
+      .z_scale = 1,
+    },
     .keys = {
       [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
@@ -576,6 +591,28 @@ static struct wiimote_config wiimote_defaults[KEY_STATE_NUM] = {
     }
   },
   [KEY_STATE_PRESSED_WITH_IR] = {
+    .motion_source = WIIMOTE_MOTION_SOURCE_IR,
+    .ir = {
+      .avg_radius = IR_AVG_RADIUS,
+      .avg_max_samples = IR_AVG_MAX_SAMPLES,
+      .avg_min_samples = IR_AVG_MIN_SAMPLES,
+      .avg_weight = IR_AVG_WEIGHT,
+      .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
+      .continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER,
+      .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
+      .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
+    },
+    .accelerometer = {
+    },
+    .motionplus = {
+      .x = 0,
+      .y = 1,
+      .z = 2,
+      .x_scale = 1,
+      .y_scale = 1,
+      .z_scale = 1,
+    },
     .keys = {
       [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
@@ -596,6 +633,7 @@ static struct wiimote_config wiimote_defaults[KEY_STATE_NUM] = {
 static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
 	[KEY_STATE_PRESSED] = {
     .analog_stick = {
+      .shape = ANALOG_STICK_SHAPE_OCTEGON,
       .x = {
         .mode = ANALOG_STICK_AXIS_MODE_NONE,
         .high = {
@@ -631,6 +669,7 @@ static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
 
 	[KEY_STATE_PRESSED_WITH_IR] = {
     .analog_stick = {
+      .shape = ANALOG_STICK_SHAPE_OCTEGON,
       .x = {
         .mode = ANALOG_STICK_AXIS_MODE_NONE,
         .high = {

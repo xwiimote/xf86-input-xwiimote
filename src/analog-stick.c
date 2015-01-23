@@ -80,17 +80,6 @@ void configure_analog_stick(struct analog_stick_config *config,
                             InputInfoPtr info)
 {
 	char axis_name[100];
-  int i;
-
-  i = 0;
-  while (name[i] != '\0' && i < sizeof(config->name) - 1) {
-    config->name[i] = name[i];
-    i++;
-  }
-  config->name[i] = '\0';
-
-	if (!name)
-		return;
 
 	if (snprintf(axis_name, 100, "%sAnalogStickAxisX", name) < 100) {
 		configure_analog_stick_axis (&config->x, axis_name, info);

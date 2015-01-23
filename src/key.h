@@ -20,7 +20,6 @@ enum key_state {
 };
 
 struct key_config {
-  char name[100];
 	int type;
 	union {
 		int btn;

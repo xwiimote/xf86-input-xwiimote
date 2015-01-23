@@ -198,6 +198,5 @@ void handle_wiimote_accelerometer(struct wiimote *wiimote,
 
 void preinit_wiimote(struct wiimote_config *config) {
   preinit_motionplus(&config->motionplus);
-  preinit_ir(&config->ir);
 }
 

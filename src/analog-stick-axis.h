@@ -24,7 +24,6 @@ struct analog_stick_axis {
 };
 
 struct analog_stick_axis_config {
-  char name[100];
 	int mode;
 	struct key_config high;
 	struct key_config low;

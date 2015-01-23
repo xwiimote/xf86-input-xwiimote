@@ -20,7 +20,6 @@ struct analog_stick {
 };
 
 struct analog_stick_config {
-  char name[100];
   enum analog_stick_shape shape;
 	struct analog_stick_axis_config x;
 	struct analog_stick_axis_config y;

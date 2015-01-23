@@ -50,6 +50,7 @@ struct ir_config {
 	int continuous_scroll_border;
   int continuous_scroll_max_x;
   int continuous_scroll_max_y;
+  double smooth_scroll_delta;
 };
 
 

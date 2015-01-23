@@ -36,7 +36,7 @@
 #include "analog-stick-axis.h"
 
 
-static void print_analog_stick_config (struct analog_stick_axis_config *config, InputInfoPtr info) {
+static void print_analog_stick_config (struct analog_stick_axis_config *config, char const *name, InputInfoPtr info) {
   char low[30];
   char high[30];
 
@@ -64,7 +64,7 @@ static void print_analog_stick_config (struct analog_stick_axis_config *config, 
       break;
   }
 
-  xf86Msg(X_INFO, "%s axis configured with mode=%d, deadzone=%d, amplify=%f%s%s\n", config->name, config->mode, config->deadzone, config->amplify, low, high);
+  xf86Msg(X_INFO, "%s axis configured with mode=%d, deadzone=%d, amplify=%f%s%s\n", name, config->mode, config->deadzone, config->amplify, low, high);
 }
 
 void configure_analog_stick_axis(struct analog_stick_axis_config *config,
@@ -122,7 +122,7 @@ void configure_analog_stick_axis(struct analog_stick_axis_config *config,
 		while (*c != ' ' && *c != '\t' && *c != '\0') c++;
 	}
 
-  print_analog_stick_config (config, info);
+  print_analog_stick_config (config, option_key, info);
 }
 
 

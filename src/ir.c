@@ -170,21 +170,21 @@ static void handle_absolute_position(struct ir *ir,
 
       distance = sqrt(pow(x, 2) + pow(y, 2));
 
-      if (distance < IR_SMOOTH_SCROLL_DELTA || IR_SMOOTH_SCROLL_DELTA <= 0) {
+      if (distance < config->smooth_scroll_delta || config->smooth_scroll_delta <= 0) {
           ir->smooth_scroll_x = x;
           ir->smooth_scroll_y = y;
       }
       else {
         if (x != 0 && y != 0) {
-          ratio = IR_SMOOTH_SCROLL_DELTA/distance;
+          ratio = config->smooth_scroll_delta/distance;
           ir->smooth_scroll_x += x * ratio;
           ir->smooth_scroll_y += y * ratio;
         } else if (x != 0) {
-          ir->smooth_scroll_x += IR_SMOOTH_SCROLL_DELTA;
+          ir->smooth_scroll_x += config->smooth_scroll_delta;
           ir->smooth_scroll_y = 0;
         } else if (y != 0) {
           ir->smooth_scroll_x = 0;
-          ir->smooth_scroll_y += IR_SMOOTH_SCROLL_DELTA;
+          ir->smooth_scroll_y += config->smooth_scroll_delta;
         } else {
           ir->smooth_scroll_x = 0;
           ir->smooth_scroll_y = 0;
@@ -297,15 +297,4 @@ void configure_ir(struct ir_config *config,
 
 	t = xf86FindOptionValue(info->options, "IRContinuousScrollMaxY");
 	parse_scale(t, &config->continuous_scroll_max_y);
-}
-
-void preinit_ir (struct ir_config *config) {
-	config->avg_radius = IR_AVG_RADIUS;
-	config->avg_max_samples = IR_AVG_MAX_SAMPLES;
-	config->avg_min_samples = IR_AVG_MIN_SAMPLES;
-	config->avg_weight = IR_AVG_WEIGHT;
-	config->keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS;
-	config->continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER;
-  config->continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X;
-  config->continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y;
 }
