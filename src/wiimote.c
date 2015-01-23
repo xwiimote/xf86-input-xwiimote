@@ -120,14 +120,49 @@ void handle_wiimote_key(struct wiimote *wiimote,
                         InputInfoPtr info)
 {
   unsigned int keycode;
-  struct key *key;
-  struct key_config *key_config;
 
   keycode = ev->v.key.code;
-  key = &wiimote->keys[keycode];
-  key_config = &config->keys[keycode];
 
-  handle_key(key, key_config, state, info);
+  switch(keycode) {
+    case XWII_KEY_LEFT:
+      keycode = WIIMOTE_KEY_LEFT;
+      break;
+    case XWII_KEY_RIGHT:
+      keycode = WIIMOTE_KEY_RIGHT;
+      break;
+    case XWII_KEY_UP:
+      keycode = WIIMOTE_KEY_UP;
+      break;
+    case XWII_KEY_DOWN:
+      keycode = WIIMOTE_KEY_DOWN;
+      break;
+    case XWII_KEY_A:
+      keycode = WIIMOTE_KEY_A;
+      break;
+    case XWII_KEY_B:
+      keycode = WIIMOTE_KEY_B;
+      break;
+    case XWII_KEY_PLUS:
+      keycode = WIIMOTE_KEY_PLUS;
+      break;
+    case XWII_KEY_MINUS:
+      keycode = WIIMOTE_KEY_MINUS;
+      break;
+    case XWII_KEY_HOME:
+      keycode = WIIMOTE_KEY_HOME;
+      break;
+    case XWII_KEY_ONE:
+      keycode = WIIMOTE_KEY_ONE;
+      break;
+    case XWII_KEY_TWO:
+      keycode = WIIMOTE_KEY_TWO;
+      break;
+    default:
+      xf86IDrvMsg(info, X_ERROR, "Invalid wiimote button %d\n", keycode);
+      return;
+  } 
+
+  handle_key(&wiimote->keys[keycode], &config->keys[keycode], state, info);
 }
 
 void handle_wiimote_ir(struct wiimote *wiimote,

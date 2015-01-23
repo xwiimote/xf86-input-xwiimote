@@ -50,13 +50,6 @@
 
 static char xwiimote_name[] = "xwiimote";
 
-
-enum motion_type {
-	MOTION_NONE,
-	MOTION_ABS,
-	MOTION_REL,
-};
-
 enum motion_source {
 	SOURCE_NONE,
 	SOURCE_ACCEL,
@@ -76,8 +69,6 @@ struct xwiimote_dev {
   enum key_state motion_key_state;
 
 	XkbRMLVOSet rmlvo;
-	unsigned int motion;
-	enum key_state key_pressed[XWII_KEY_NUM];
 
   struct wiimote wiimote;
   struct wiimote_config wiimote_config[KEY_STATE_NUM];

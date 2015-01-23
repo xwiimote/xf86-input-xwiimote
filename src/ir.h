@@ -14,7 +14,7 @@
 #define IR_CONTINUOUS_SCROLL_MAX_Y 10
 #define IR_MAX_Y 767
 #define IR_MAX_X 1023
-#define IR_SMOOTH_SCROLL_DISTANCE 1.0
+#define IR_SMOOTH_SCROLL_DELTA 1.0
 
 #define IR_KEYMAP_EXPIRY_SECS 1
 
@@ -30,6 +30,9 @@ struct ir {
 	int avg_x;
 	int avg_y;
 	int avg_count;
+
+  int x;
+  int y;
 
   double continuous_scroll_subpixel_x;
   double continuous_scroll_subpixel_y;

@@ -56,11 +56,18 @@ void handle_nunchuk_key(struct nunchuk *nunchuk,
 
   keycode = ev->v.key.code;
 
-  if (keycode > -1 && keycode < NUNCHUK_KEY_NUM) {
-    handle_key(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
-  } else {
-    xf86IDrvMsg(info, X_ERROR, "Invalid nunchuk button %d\n", keycode);
-  }
+  switch(keycode) {
+    case XWII_KEY_C:
+      keycode = NUNCHUK_KEY_C;
+      break;
+    case XWII_KEY_Z:
+      keycode = NUNCHUK_KEY_Z;
+      break;
+    default:
+      xf86IDrvMsg(info, X_ERROR, "Invalid nunchuk button %d\n", keycode);
+      return;
+  } 
+  handle_key(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
 }
 
 void configure_nunchuk(struct nunchuk_config *config,
