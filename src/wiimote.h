@@ -57,5 +57,6 @@ void handle_wiimote_ir(struct wiimote *wiimote, struct wiimote_config *config, s
 void handle_wiimote_motionplus(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 void handle_wiimote_accelerometer(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 
+unsigned int xwii_key_to_wiimote_key(unsigned int keycode, InputInfoPtr info);
 
 #endif

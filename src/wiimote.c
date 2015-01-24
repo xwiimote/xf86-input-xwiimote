@@ -43,6 +43,38 @@ BOOL wiimote_ir_is_active(struct wiimote *wiimote,
   return ir_is_active(&wiimote->ir, &config->ir, ev);
 }
 
+unsigned int xwii_key_to_wiimote_key(unsigned int keycode,
+                                            InputInfoPtr info)
+{
+  switch(keycode) {
+    case XWII_KEY_LEFT:
+      return WIIMOTE_KEY_LEFT;
+    case XWII_KEY_RIGHT:
+      return WIIMOTE_KEY_RIGHT;
+    case XWII_KEY_UP:
+      return WIIMOTE_KEY_UP;
+    case XWII_KEY_DOWN:
+      return WIIMOTE_KEY_DOWN;
+    case XWII_KEY_A:
+      return WIIMOTE_KEY_A;
+    case XWII_KEY_B:
+      return WIIMOTE_KEY_B;
+    case XWII_KEY_PLUS:
+      return WIIMOTE_KEY_PLUS;
+    case XWII_KEY_MINUS:
+      return WIIMOTE_KEY_MINUS;
+    case XWII_KEY_HOME:
+      return WIIMOTE_KEY_HOME;
+    case XWII_KEY_ONE:
+      return WIIMOTE_KEY_ONE;
+    case XWII_KEY_TWO:
+      return WIIMOTE_KEY_TWO;
+    default:
+      xf86IDrvMsg(info, X_ERROR, "Invalid wiimote button %d\n", keycode);
+      return 0;
+  } 
+}
+
 static void configure_wiimote_keys(struct wiimote_config *config,
                                    char const * prefix,
                                    InputInfoPtr info) {
@@ -121,46 +153,7 @@ void handle_wiimote_key(struct wiimote *wiimote,
 {
   unsigned int keycode;
 
-  keycode = ev->v.key.code;
-
-  switch(keycode) {
-    case XWII_KEY_LEFT:
-      keycode = WIIMOTE_KEY_LEFT;
-      break;
-    case XWII_KEY_RIGHT:
-      keycode = WIIMOTE_KEY_RIGHT;
-      break;
-    case XWII_KEY_UP:
-      keycode = WIIMOTE_KEY_UP;
-      break;
-    case XWII_KEY_DOWN:
-      keycode = WIIMOTE_KEY_DOWN;
-      break;
-    case XWII_KEY_A:
-      keycode = WIIMOTE_KEY_A;
-      break;
-    case XWII_KEY_B:
-      keycode = WIIMOTE_KEY_B;
-      break;
-    case XWII_KEY_PLUS:
-      keycode = WIIMOTE_KEY_PLUS;
-      break;
-    case XWII_KEY_MINUS:
-      keycode = WIIMOTE_KEY_MINUS;
-      break;
-    case XWII_KEY_HOME:
-      keycode = WIIMOTE_KEY_HOME;
-      break;
-    case XWII_KEY_ONE:
-      keycode = WIIMOTE_KEY_ONE;
-      break;
-    case XWII_KEY_TWO:
-      keycode = WIIMOTE_KEY_TWO;
-      break;
-    default:
-      xf86IDrvMsg(info, X_ERROR, "Invalid wiimote button %d\n", keycode);
-      return;
-  } 
+  keycode = xwii_key_to_wiimote_key(ev->v.key.code, info);
 
   handle_key(&wiimote->keys[keycode], &config->keys[keycode], state, info);
 }

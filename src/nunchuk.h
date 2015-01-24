@@ -27,4 +27,6 @@ void configure_nunchuk(struct nunchuk_config *config, char const * prefix, struc
 void handle_nunchuk_analog_stick(struct nunchuk *nunchuk, struct nunchuk_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 void handle_nunchuk_key(struct nunchuk *nunchuk, struct nunchuk_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 
+unsigned int xwii_key_to_nunchuk_key(unsigned int keycode, InputInfoPtr info);
+
 #endif

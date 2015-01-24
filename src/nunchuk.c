@@ -46,6 +46,21 @@ void handle_nunchuk_analog_stick(struct nunchuk *nunchuk,
 }
 
 
+unsigned int xwii_key_to_nunchuk_key(unsigned int keycode,
+                                     InputInfoPtr info)
+{
+  switch(keycode) {
+    case XWII_KEY_C:
+      return NUNCHUK_KEY_C;
+    case XWII_KEY_Z:
+      return NUNCHUK_KEY_Z;
+    default:
+      xf86IDrvMsg(info, X_ERROR, "Invalid nunchuk button %d\n", keycode);
+      return 0;
+  } 
+}
+
+
 void handle_nunchuk_key(struct nunchuk *nunchuk,
                         struct nunchuk_config *config,
                         struct xwii_event *ev,
@@ -54,19 +69,8 @@ void handle_nunchuk_key(struct nunchuk *nunchuk,
 {  
   unsigned int keycode;
 
-  keycode = ev->v.key.code;
+  keycode = xwii_key_to_nunchuk_key(ev->v.key.code, info);
 
-  switch(keycode) {
-    case XWII_KEY_C:
-      keycode = NUNCHUK_KEY_C;
-      break;
-    case XWII_KEY_Z:
-      keycode = NUNCHUK_KEY_Z;
-      break;
-    default:
-      xf86IDrvMsg(info, X_ERROR, "Invalid nunchuk button %d\n", keycode);
-      return;
-  } 
   handle_key(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
 }
 

@@ -13,7 +13,7 @@ enum key_type {
 };
 
 enum key_state {
-  KEY_STATE_RELEASED,
+  KEY_STATE_RELEASED = 0,
 	KEY_STATE_PRESSED,
 	KEY_STATE_PRESSED_WITH_IR,
 	KEY_STATE_NUM
