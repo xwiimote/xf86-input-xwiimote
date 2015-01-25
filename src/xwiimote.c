@@ -65,7 +65,7 @@ struct xwiimote_dev {
 	bool dup;
 	struct xwii_iface *iface;
 	unsigned int ifs;
-  enum key_state motion_key_layout;
+  enum key_state motion_layout;
 
 	XkbRMLVOSet rmlvo;
 
@@ -270,7 +270,7 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret != Success)
 		return ret;
 
-  wiimote_config = &dev->wiimote_config[dev->motion_key_layout];
+  wiimote_config = &dev->wiimote_config[dev->motion_layout];
 
 	switch(wiimote_config->motion_source) {
     case WIIMOTE_MOTION_SOURCE_ACCELEROMETER:
@@ -284,16 +284,11 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
         MOTIONPLUS_MIN_Y, MOTIONPLUS_MAX_Y);
       break;
     case WIIMOTE_MOTION_SOURCE_IR:
-      ret = xwiimote_prepare_abs(dev, device, 
-        IR_MIN_X, IR_MAX_X,
-        IR_MIN_Y, IR_MAX_Y);
-/* TODO
-      ret = xwiimote_prepare_abs(dev, device, 
+      ret = xwiimote_prepare_abs(dev, device,
         IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER,
         IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
         IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER,
         IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
-*/
       break;
     default:
       ret = Success;
@@ -311,25 +306,23 @@ static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 	return Success;
 }
 
-static unsigned int calculate_next_key_layout(struct key *key, BOOL ir_is_active)
+static unsigned int calculate_next_key_layout(struct key *key, 
+                                              unsigned int motion_layout)
 {
   unsigned int layout;
 
-  //Setup config 
-  switch(key->state) {
-    case KEY_STATE_PRESSED:
-      layout = KEY_LAYOUT_DEFAULT;
-      break;
-    case KEY_STATE_PRESSED_WITH_IR:
-      layout = KEY_LAYOUT_IR;
-      break;
-    default:
-      if (ir_is_active) {
+  if (key->state) {
+    switch(key->state) {
+      case KEY_STATE_PRESSED_WITH_IR:
         layout = KEY_LAYOUT_IR;
-      } else {
+        break;
+      default:
+      case KEY_STATE_PRESSED:
         layout = KEY_LAYOUT_DEFAULT;
-      }
-      break;
+        break;
+    }
+  } else {
+    layout = motion_layout;
   }
 
   return layout;
@@ -337,18 +330,21 @@ static unsigned int calculate_next_key_layout(struct key *key, BOOL ir_is_active
 
 static unsigned int calculate_next_key_state(struct key *key,
 	                                           struct xwii_event ev,
-                                             BOOL ir_is_active)
+                                             unsigned int motion_layout)
 {
   unsigned int state;
 
-  //Setup keystate
   if (key->state && ev.v.key.state) {
     state = key->state;
   } else if (!key->state && ev.v.key.state) {
-    if (ir_is_active) {
-      state = KEY_STATE_PRESSED_WITH_IR;
-    } else {
-      state = KEY_STATE_PRESSED;
+    switch(motion_layout) {
+      case KEY_LAYOUT_IR:
+        state = KEY_STATE_PRESSED_WITH_IR;
+        break;
+      default:
+      case KEY_LAYOUT_DEFAULT:
+        state = KEY_STATE_PRESSED;
+        break;
     }
   } else {
     state = KEY_STATE_RELEASED;
@@ -358,16 +354,20 @@ static unsigned int calculate_next_key_state(struct key *key,
 }
 
 static unsigned int calculate_next_analog_stick_state(struct analog_stick *analog_stick,
-                                                      BOOL ir_is_active)
+                                                      unsigned int motion_layout)
 {
   unsigned int state;
 
   state = analog_stick->state;
   if (!state) {
-    if (ir_is_active) {
-      state = KEY_STATE_PRESSED_WITH_IR;
-    } else {
-      state = KEY_STATE_PRESSED;
+    switch(motion_layout) {
+      case KEY_LAYOUT_IR:
+        state = KEY_STATE_PRESSED_WITH_IR;
+        break;
+      case KEY_LAYOUT_DEFAULT:
+      default:
+        state = KEY_STATE_PRESSED;
+        break;
     }
   }
 
@@ -375,24 +375,22 @@ static unsigned int calculate_next_analog_stick_state(struct analog_stick *analo
 }
 
 static unsigned int calculate_next_analog_stick_layout(struct analog_stick *analog_stick,
-                                                       BOOL ir_is_active)
+                                                       unsigned int motion_layout)
 {
   unsigned int layout;
 
-  switch(analog_stick->state) {
-    case KEY_STATE_PRESSED:
-      layout = KEY_LAYOUT_DEFAULT;
-      break;
-    case KEY_STATE_PRESSED_WITH_IR:
-      layout = KEY_LAYOUT_IR;
-      break;
-    default:
-      if (ir_is_active) {
+  if (analog_stick->state) {
+    switch(analog_stick->state) {
+      case KEY_STATE_PRESSED_WITH_IR:
         layout = KEY_LAYOUT_IR;
-      } else {
+        break;
+      default:
+      case KEY_STATE_PRESSED:
         layout = KEY_LAYOUT_DEFAULT;
-      }
-      break;
+        break;
+    }
+  } else {
+    layout = motion_layout;
   }
 
   return layout;
@@ -413,7 +411,6 @@ static void xwiimote_input(int fd, pointer data)
   unsigned int state;
   unsigned int layout;
   unsigned int keycode;
-  BOOL ir_is_active;
 
 	dev = info->private;
 	if (dev->dup)
@@ -425,11 +422,10 @@ static void xwiimote_input(int fd, pointer data)
 		if (ret)
 			break;
 
-    ir_is_active = wiimote_ir_is_active (wiimote, &dev->wiimote_config[dev->motion_key_layout], &ev);
-    if (ir_is_active) {
-      dev->motion_key_layout = KEY_STATE_PRESSED_WITH_IR;
+    if (wiimote_ir_is_active (wiimote, &dev->wiimote_config[dev->motion_layout], &ev)) {
+      dev->motion_layout = KEY_LAYOUT_IR;
     } else {
-      dev->motion_key_layout = KEY_STATE_PRESSED;
+      dev->motion_layout = KEY_LAYOUT_DEFAULT;
     }
 
 		switch (ev.type) {
@@ -439,38 +435,45 @@ static void xwiimote_input(int fd, pointer data)
         break;
 			case XWII_EVENT_KEY:
         keycode = xwii_key_to_wiimote_key(ev.v.key.code, info);
-        layout = calculate_next_key_layout(&wiimote->keys[keycode], ir_is_active);
-        state = calculate_next_key_state(&wiimote->keys[keycode], ev, ir_is_active);
+        layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
+        state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         wiimote_config = &dev->wiimote_config[layout];
 				handle_wiimote_key(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_ACCEL:
-        layout = dev->motion_key_layout;
-        state = dev->motion_key_layout;
+        layout = dev->motion_layout;
+        state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
 				handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_IR:
-        layout = dev->motion_key_layout;
-        state = dev->motion_key_layout;
-        wiimote_config = &dev->wiimote_config[layout];
+        switch(dev->motion_layout) {
+          case KEY_LAYOUT_IR:
+            state = KEY_STATE_PRESSED_WITH_IR;
+            break;
+          default:
+          case KEY_LAYOUT_DEFAULT:
+            state = KEY_STATE_PRESSED;
+            break;
+        }
+        wiimote_config = &dev->wiimote_config[dev->motion_layout];
 				handle_wiimote_ir(wiimote, wiimote_config, &ev, state, dev->info);
 			case XWII_EVENT_MOTION_PLUS:
-        layout = dev->motion_key_layout;
-        state = dev->motion_key_layout;
+        layout = dev->motion_layout;
+        state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
 				handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_NUNCHUK_KEY:
         keycode = xwii_key_to_nunchuk_key(ev.v.key.code, info);
-        layout = calculate_next_key_layout(&wiimote->keys[keycode], ir_is_active);
-        state = calculate_next_key_state(&wiimote->keys[keycode], ev, ir_is_active);
+        layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
+        state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
 				handle_nunchuk_key(nunchuk, nunchuk_config, &ev, state, dev->info);
 				break;
 			case XWII_EVENT_NUNCHUK_MOVE:
-        layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, ir_is_active);
-        state = calculate_next_analog_stick_state(&nunchuk->analog_stick, ir_is_active);
+        layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, dev->motion_layout);
+        state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
 				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, dev->info);
 				break;
@@ -700,8 +703,8 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-      [WIIMOTE_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = 1 },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = 3 },
       [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
       [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
       [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
@@ -800,7 +803,7 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	memset(dev, 0, sizeof(*dev));
 	dev->info = info;
 	dev->dev_id = -1;
-  dev->motion_key_layout = KEY_LAYOUT_DEFAULT;
+  dev->motion_layout = KEY_LAYOUT_DEFAULT;
 	info->private = dev;
 	info->type_name = (char*)XI_MOUSE;
 	info->device_control = xwiimote_control;

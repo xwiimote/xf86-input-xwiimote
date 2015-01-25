@@ -186,7 +186,7 @@ void handle_analog_stick_axis(struct analog_stick_axis *axis,
 
   /* Handle pointer motion */
   if (config->mode != ANALOG_STICK_AXIS_MODE_NONE) {
-    xf86PostMotionEvent(info->dev, 0, first_valuator, 2 - first_valuator, axis->delta);
+    xf86PostMotionEvent(info->dev, Relative, first_valuator, 2 - first_valuator, axis->delta);
   }
 
   /* Give easy access to the state */

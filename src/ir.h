@@ -9,14 +9,15 @@
 #define IR_AVG_MAX_SAMPLES 8
 #define IR_AVG_MIN_SAMPLES 4
 #define IR_AVG_WEIGHT 3
-#define IR_CONTINUOUS_SCROLL_BORDER 20
-#define IR_CONTINUOUS_SCROLL_MAX_X 10
-#define IR_CONTINUOUS_SCROLL_MAX_Y 10
+#define IR_DEADZONE_BORDER 10
+#define IR_CONTINUOUS_SCROLL_BORDER 50
+#define IR_CONTINUOUS_SCROLL_MAX_X 1 
+#define IR_CONTINUOUS_SCROLL_MAX_Y 1
 #define IR_MIN_Y 0
 #define IR_MAX_Y 767
 #define IR_MIN_X 0
 #define IR_MAX_X 1023
-#define IR_SMOOTH_SCROLL_DELTA 1.0
+#define IR_SMOOTH_SCROLL_DELTA 100.0
 
 #define IR_KEYMAP_EXPIRY_SECS 1
 
@@ -38,6 +39,8 @@ struct ir {
   double continuous_scroll_subpixel_x;
   double continuous_scroll_subpixel_y;
 
+  double relative_offset_y;
+  double relative_offset_x;
   double smooth_scroll_x;
   double smooth_scroll_y;
 };
