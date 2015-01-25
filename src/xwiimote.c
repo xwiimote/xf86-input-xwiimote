@@ -289,10 +289,10 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
       break;
     case WIIMOTE_MOTION_SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device,
-        IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER,
-        IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
-        IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER,
-        IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
+        IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER_X,
+        IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER_X,
+        IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER_Y,
+        IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER_Y);
       break;
     default:
       ret = Success;
@@ -480,8 +480,8 @@ static void xwiimote_input(int fd, pointer data)
         state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
         wiimote_config = &dev->wiimote_config[layout];
+        handle_continuous_scrolling (&wiimote->ir, &wiimote_config->ir, &ev, info); 
 				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, dev->info);
-        handle_continuous_scrolling (&wiimote->ir, &wiimote_config->ir, &ev, info); // This should eventually be moved
 				break;
 		}
 	} while (!ret);
@@ -652,7 +652,8 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .avg_weight = IR_AVG_WEIGHT,
       .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
 
-      .continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER,
+      .continuous_scroll_border_x = IR_CONTINUOUS_SCROLL_BORDER_X,
+      .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
       .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
@@ -672,8 +673,8 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
-      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
       [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
       [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
@@ -689,7 +690,8 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .avg_min_samples = IR_AVG_MIN_SAMPLES,
       .avg_weight = IR_AVG_WEIGHT,
       .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
-      .continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER,
+      .continuous_scroll_border_x = IR_CONTINUOUS_SCROLL_BORDER_X,
+      .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
       .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
@@ -709,8 +711,8 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = 1 },
-      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = 3 },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
       [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
       [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },

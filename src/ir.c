@@ -166,8 +166,25 @@ static void handle_absolute_position(struct ir *ir,
   // Calculate the absolute y value 
   y = ir->y;
 
-  ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
-  ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
+  if (ir->lock_x && (
+    (ir->smooth_scroll_x < IR_MAX_X / 2 && ir->previous_smooth_scroll_x > IR_MAX_X / 2) ||
+    (ir->smooth_scroll_x > IR_MAX_X / 2 && ir->previous_smooth_scroll_x < IR_MAX_X / 2))) {
+    ir->lock_x = FALSE;
+  }
+
+  if (ir->lock_y && (
+    (ir->smooth_scroll_y < IR_MAX_Y / 2 && ir->previous_smooth_scroll_y > IR_MAX_Y / 2) ||
+    (ir->smooth_scroll_y > IR_MAX_Y / 2 && ir->previous_smooth_scroll_y < IR_MAX_Y / 2))) {
+    ir->lock_y = FALSE;
+  }
+
+  if (!ir->lock_x) {
+    ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
+  }
+
+  if (!ir->lock_y) {
+    ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
+  }
 
   /* Moves cursor smoothly to the point pointed at with a transition */
   {
@@ -196,14 +213,18 @@ static void handle_absolute_position(struct ir *ir,
     x = ir->smooth_scroll_x - ir->previous_smooth_scroll_x;
     y = ir->smooth_scroll_y - ir->previous_smooth_scroll_y;
 
-    if (ir->smooth_scroll_x > (config->continuous_scroll_border + IR_DEADZONE_BORDER) &&
-        ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
+    if (!ir->lock_x) {
+      if (ir->smooth_scroll_x > (config->continuous_scroll_border_x + IR_DEADZONE_BORDER) &&
+          ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border_x - IR_DEADZONE_BORDER)) {
+        xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
+      }
     }
 
-    if (ir->smooth_scroll_y > (config->continuous_scroll_border + IR_DEADZONE_BORDER) &&
-        ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
+    if (!ir->lock_y) {
+      if (ir->smooth_scroll_y > (config->continuous_scroll_border_y + IR_DEADZONE_BORDER) &&
+          ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border_y - IR_DEADZONE_BORDER)) {
+        xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
+      }
     }
 
     //xf86IDrvMsg(info, X_INFO, "smooth scroll (%d, %d)\n", x, y);
@@ -223,11 +244,11 @@ void handle_continuous_scrolling(struct ir *ir,
 
   /* X */
   x = ir->smooth_scroll_x;
-  x_scale = (double) config->continuous_scroll_max_x / (double) config->continuous_scroll_border;
-  if (x < config->continuous_scroll_border) {
-    ir->continuous_scroll_subpixel_x += (x - config->continuous_scroll_border) * x_scale;
-  } else if (x > IR_MAX_X - config->continuous_scroll_border) {
-    ir->continuous_scroll_subpixel_x += (x - (IR_MAX_X - config->continuous_scroll_border)) * x_scale;
+  x_scale = (double) config->continuous_scroll_max_x / (double) config->continuous_scroll_border_x;
+  if (x < config->continuous_scroll_border_x) {
+    ir->continuous_scroll_subpixel_x += (x - config->continuous_scroll_border_x) * x_scale;
+  } else if (x > IR_MAX_X - config->continuous_scroll_border_x) {
+    ir->continuous_scroll_subpixel_x += (x - (IR_MAX_X - config->continuous_scroll_border_x)) * x_scale;
   } else {
     ir->continuous_scroll_subpixel_x = 0;
   }
@@ -237,11 +258,11 @@ void handle_continuous_scrolling(struct ir *ir,
 
   /* Y */
   y = ir->smooth_scroll_y;
-  y_scale = (double) config->continuous_scroll_max_y / (double) config->continuous_scroll_border;
-  if (y < config->continuous_scroll_border) {
-    ir->continuous_scroll_subpixel_y += (y - config->continuous_scroll_border) * y_scale;
-  } else if (y > IR_MAX_Y - config->continuous_scroll_border) {
-    ir->continuous_scroll_subpixel_y += (y - (IR_MAX_Y - config->continuous_scroll_border)) * y_scale;
+  y_scale = (double) config->continuous_scroll_max_y / (double) config->continuous_scroll_border_y;
+  if (y < config->continuous_scroll_border_y) {
+    ir->continuous_scroll_subpixel_y += (y - config->continuous_scroll_border_y) * y_scale;
+  } else if (y > IR_MAX_Y - config->continuous_scroll_border_y) {
+    ir->continuous_scroll_subpixel_y += (y - (IR_MAX_Y - config->continuous_scroll_border_y)) * y_scale;
   } else {
     ir->continuous_scroll_subpixel_y = 0;
   }
@@ -249,9 +270,15 @@ void handle_continuous_scrolling(struct ir *ir,
   ir->continuous_scroll_subpixel_y -= scroll_y; 
   ir->relative_offset_y += scroll_y;
 
-  //xf86IDrvMsg(info, X_INFO, "continuous scrolling delta (%d, %d)\n", scroll_x, scroll_y);
+  if (scroll_x) {
+    xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) (scroll_x));
+    ir->lock_x = TRUE;
+  }
 
-  xf86PostMotionEvent(info->dev, Relative, 0, 2, (int) (scroll_x), (int) (scroll_y));
+  if (scroll_y) {
+    xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) (scroll_y));
+    ir->lock_y = TRUE;
+  }
 }
 
 
@@ -313,10 +340,15 @@ void configure_ir(struct ir_config *config,
 	parse_scale(t, &config->keymap_expiry_secs);
   xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->keymap_expiry_secs);
 
-  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorder", prefix);
+  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorderX", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->continuous_scroll_border);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border);
+	parse_scale(t, &config->continuous_scroll_border_x);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_x);
+
+  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorderY", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
+	parse_scale(t, &config->continuous_scroll_border_y);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_y);
 
   snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollMaxX", prefix);
 	t = xf86FindOptionValue(info->options, option_key);

@@ -10,7 +10,8 @@
 #define IR_AVG_MIN_SAMPLES 4
 #define IR_AVG_WEIGHT 3
 #define IR_DEADZONE_BORDER 10
-#define IR_CONTINUOUS_SCROLL_BORDER 200
+#define IR_CONTINUOUS_SCROLL_BORDER_X 100
+#define IR_CONTINUOUS_SCROLL_BORDER_Y 0
 #define IR_CONTINUOUS_SCROLL_MAX_X 5
 #define IR_CONTINUOUS_SCROLL_MAX_Y 5
 #define IR_MIN_Y 0
@@ -45,6 +46,9 @@ struct ir {
   double smooth_scroll_y;
   double previous_smooth_scroll_x;
   double previous_smooth_scroll_y;
+
+  BOOL lock_x;
+  BOOL lock_y;
 };
 
 struct ir_config {
@@ -53,7 +57,8 @@ struct ir_config {
 	int avg_max_samples;
 	int avg_min_samples;
 	int keymap_expiry_secs;
-	int continuous_scroll_border;
+	int continuous_scroll_border_x;
+	int continuous_scroll_border_y;
   int continuous_scroll_max_x;
   int continuous_scroll_max_y;
   double smooth_scroll_delta;
