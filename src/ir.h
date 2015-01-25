@@ -43,6 +43,8 @@ struct ir {
   double relative_offset_x;
   double smooth_scroll_x;
   double smooth_scroll_y;
+  double previous_smooth_scroll_x;
+  double previous_smooth_scroll_y;
 };
 
 struct ir_config {
@@ -64,6 +66,7 @@ void preinit_ir (struct ir_config *config);
 
 
 void handle_ir(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);
+void handle_continuous_scrolling(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);
 
 
 #endif

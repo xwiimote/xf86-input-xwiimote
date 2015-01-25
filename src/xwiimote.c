@@ -166,7 +166,9 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	char btn1[] = BTN_LABEL_PROP_BTN_LEFT;
 	char btn2[] = BTN_LABEL_PROP_BTN_RIGHT;
 	char btn3[] = BTN_LABEL_PROP_BTN_MIDDLE;
-	unsigned char map[] = { 0, 1, 2, 3 };
+	char btn4[] = BTN_LABEL_PROP_BTN_WHEEL_UP;
+	char btn5[] = BTN_LABEL_PROP_BTN_WHEEL_DOWN;
+	unsigned char map[] = { 0, 1, 2, 3, 4, 5 };
 
 	num = 4;
 	atoms = malloc(sizeof(*atoms) * num);
@@ -178,6 +180,8 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	atoms[1] = XIGetKnownProperty(btn1);
 	atoms[2] = XIGetKnownProperty(btn2);
 	atoms[3] = XIGetKnownProperty(btn3);
+	atoms[3] = XIGetKnownProperty(btn4);
+	atoms[3] = XIGetKnownProperty(btn5);
 
 	if (!InitButtonClassDeviceStruct(device, 1, atoms, map)) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init button class\n");
@@ -475,7 +479,9 @@ static void xwiimote_input(int fd, pointer data)
         layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, dev->motion_layout);
         state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
+        wiimote_config = &dev->wiimote_config[layout];
 				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, dev->info);
+        handle_continuous_scrolling (&wiimote->ir, &wiimote_config->ir, &ev, info); // This should eventually be moved
 				break;
 		}
 	} while (!ret);
@@ -662,14 +668,14 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .z_scale = 1,
     },
     .keys = {
-      [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELUP },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-      [WIIMOTE_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
-      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
       [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
@@ -699,14 +705,14 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .z_scale = 1,
     },
     .keys = {
-      [WIIMOTE_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELUP },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
       [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = 1 },
       [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = 3 },
-      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
       [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
       [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
@@ -748,7 +754,7 @@ static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
     },
     .keys = {
       [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
-      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
     }
 	},
 
@@ -784,7 +790,7 @@ static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
     },
     .keys = {
       [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
-      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_LEFTSHIFT },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
     }
 	},
 };

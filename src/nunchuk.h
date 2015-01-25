@@ -5,6 +5,8 @@
 
 #include "analog-stick.h"
 
+#define NUNCHUK_ANALOG_STICK_INDEX 0
+
 enum nunchuk_key {
   NUNCHUK_KEY_C,
   NUNCHUK_KEY_Z,

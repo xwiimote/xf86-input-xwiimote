@@ -26,6 +26,6 @@ struct analog_stick_config {
 };
 
 void configure_analog_stick(struct analog_stick_config *config,	char const *name, InputInfoPtr info);
-void handle_analog_stick(struct analog_stick *stick, struct analog_stick_config *config, struct xwii_event *ev, int stick_index, int state, InputInfoPtr info);
+void handle_analog_stick(struct analog_stick *stick, struct analog_stick_config *config, struct xwii_event *ev, int stick_index, unsigned int state, InputInfoPtr info);
 
 #endif

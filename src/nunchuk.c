@@ -42,7 +42,7 @@ void handle_nunchuk_analog_stick(struct nunchuk *nunchuk,
                                  unsigned int state,
                                  InputInfoPtr info)
 {
-  handle_analog_stick(&nunchuk->analog_stick, &config->analog_stick, ev, 0, state, info);
+  handle_analog_stick(&nunchuk->analog_stick, &config->analog_stick, ev, NUNCHUK_ANALOG_STICK_INDEX, state, info);
 }
 
 

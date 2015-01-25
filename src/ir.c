@@ -166,6 +166,9 @@ static void handle_absolute_position(struct ir *ir,
   // Calculate the absolute y value 
   y = ir->y;
 
+  ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
+  ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
+
   /* Moves cursor smoothly to the point pointed at with a transition */
   {
     double distance;
@@ -190,27 +193,29 @@ static void handle_absolute_position(struct ir *ir,
       } 
     }
 
-    x = ir->smooth_scroll_x;
-    y = ir->smooth_scroll_y;
+    x = ir->smooth_scroll_x - ir->previous_smooth_scroll_x;
+    y = ir->smooth_scroll_y - ir->previous_smooth_scroll_y;
 
-    if (x > (config->continuous_scroll_border + IR_DEADZONE_BORDER) && x < (IR_MAX_X - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Absolute, 0, 1, (int) x);
+    if (ir->smooth_scroll_x > (config->continuous_scroll_border + IR_DEADZONE_BORDER) &&
+        ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
+      xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
     }
 
-    if (y > (config->continuous_scroll_border + IR_DEADZONE_BORDER) && y < (IR_MAX_Y - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Absolute, 1, 1, (int) y);
+    if (ir->smooth_scroll_y > (config->continuous_scroll_border + IR_DEADZONE_BORDER) &&
+        ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border - IR_DEADZONE_BORDER)) {
+      xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
     }
 
-    xf86IDrvMsg(info, X_INFO, "smooth scroll (%d, %d)\n", x, y);
+    //xf86IDrvMsg(info, X_INFO, "smooth scroll (%d, %d)\n", x, y);
   }
 
 }
 
 
-static void handle_continuous_scrolling(struct ir *ir,
-                                        struct ir_config *config,
-                                        struct xwii_event *ev,
-                                        InputInfoPtr info)
+void handle_continuous_scrolling(struct ir *ir,
+                                 struct ir_config *config,
+                                 struct xwii_event *ev,
+                                 InputInfoPtr info)
 {
   int scroll_x, scroll_y;
   double x_scale, y_scale;
@@ -244,7 +249,7 @@ static void handle_continuous_scrolling(struct ir *ir,
   ir->continuous_scroll_subpixel_y -= scroll_y; 
   ir->relative_offset_y += scroll_y;
 
-  xf86IDrvMsg(info, X_INFO, "continuous scrolling delta (%d, %d)\n", scroll_x, scroll_y);
+  //xf86IDrvMsg(info, X_INFO, "continuous scrolling delta (%d, %d)\n", scroll_x, scroll_y);
 
   xf86PostMotionEvent(info->dev, Relative, 0, 2, (int) (scroll_x), (int) (scroll_y));
 }
@@ -257,7 +262,6 @@ void handle_ir(struct ir *ir,
 {
   calculate_ir_coordinates(ir, config, ev, info);
   handle_absolute_position(ir, config, ev, info);
-  handle_continuous_scrolling(ir, config, ev, info);
 }
 
 

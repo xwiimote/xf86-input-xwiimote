@@ -5,6 +5,11 @@
 #include <xf86Xinput.h>
 
 #define MIN_KEYCODE 8
+#define BUTTON_LEFT 1
+#define BUTTON_MIDDLE 2
+#define BUTTON_RIGHT 3
+#define BUTTON_WHEELUP 4
+#define BUTTON_WHEELDOWN 5
 
 enum key_type {
 	FUNC_IGNORE,

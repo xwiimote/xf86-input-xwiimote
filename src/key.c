@@ -46,7 +46,7 @@ static void press_key(struct key *key,
 	switch (config->type) {
 		case FUNC_BTN:
 			btn = config->u.btn;
-			xf86PostButtonEvent(info->dev, 0, btn, 1, 0, 0);
+			xf86PostButtonEvent(info->dev, Relative, btn, 1, 0, 0);
 			break;
 		case FUNC_KEY:
 			code = config->u.key + MIN_KEYCODE;
@@ -68,7 +68,7 @@ static void depress_key(struct key *key,
 	switch (config->type) {
 		case FUNC_BTN:
 			btn = config->u.btn;
-			xf86PostButtonEvent(info->dev, 0, btn,	0, 0, 0);
+			xf86PostButtonEvent(info->dev, Relative, btn,	0, 0, 0);
 			break;
 		case FUNC_KEY:
 			code = config->u.key + MIN_KEYCODE;
@@ -615,13 +615,19 @@ void configure_key_by_value(struct key_config *config,
 		config->type = FUNC_IGNORE;
 	} else if (!strcasecmp(value, "left-button")) {
 		config->type = FUNC_BTN;
-		config->u.btn = 1;
-	} else if (!strcasecmp(value, "right-button")) {
-		config->type = FUNC_BTN;
-		config->u.btn = 3;
+		config->u.btn = BUTTON_LEFT;
 	} else if (!strcasecmp(value, "middle-button")) {
 		config->type = FUNC_BTN;
-		config->u.btn = 2;
+		config->u.btn = BUTTON_MIDDLE;
+	} else if (!strcasecmp(value, "right-button")) {
+		config->type = FUNC_BTN;
+		config->u.btn = BUTTON_RIGHT;
+  } else if (!strcasecmp(value, "wheel-up")) {
+    config->type = FUNC_BTN;
+    config->u.btn = BUTTON_WHEELUP;
+  } else if (!strcasecmp(value, "wheel-down")) {
+    config->type = FUNC_BTN;
+    config->u.btn = BUTTON_WHEELDOWN;
 	} else {
 		for (i = 0; key2value[i].key; ++i) {
 			if (!strcasecmp(key2value[i].key, value))

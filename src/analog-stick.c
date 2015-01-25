@@ -35,35 +35,50 @@
 
 #include "analog-stick.h"
 
-
+#define TO_RADIANS(deg) (deg * M_PI / 180)
 
 static int analog_stick_map_x_to_octegon(int x, int y) {
-    double slope;
     double max_x;
     double real_x;
     double gradient_length;
     double gradient_slice;
+    BOOL is_negative;
 
-    slope = y / x;
+    if (x == 0) {
+      return 0;
+    } else if (y == 0) {
+      return x;
+    }
 
-    if (slope > 1.0) {
-      //scale changes for x
-      max_x = y + (x/tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
+    is_negative = (x < 0);
 
-      gradient_length = 2 * (tan(ANALOG_STICK_SLICE_CENTER_ANGLE / 2) * max_x);
-      gradient_slice = x / sin(ANALOG_STICK_SLICE_OUTER_ANGLE);
+    // Convert everything to the first quadrant for simplicity
+    y = abs(y);
+    x = abs(x);
+
+    if ((y/x) > 1.0) {
+      //scale changes for x 
+      max_x = y + (x/tan(TO_RADIANS(ANALOG_STICK_SLICE_OUTER_ANGLE)));
+
+      gradient_length = 2 * (tan(TO_RADIANS(ANALOG_STICK_SLICE_CENTER_ANGLE / 2)) * max_x);
+      gradient_slice = x / sin(TO_RADIANS(ANALOG_STICK_SLICE_OUTER_ANGLE));
 
       real_x = gradient_slice / gradient_length * max_x;
 
     } else {
       //Map directly to to x axis
-      real_x = x + (y / tan(ANALOG_STICK_SLICE_OUTER_ANGLE));
+      real_x = x + (y / tan(TO_RADIANS(ANALOG_STICK_SLICE_OUTER_ANGLE)));
     }
+
+    if (is_negative) {
+      real_x *= -1;
+    }
+
     return real_x;
 }
 
 static int analog_stick_map_y_to_octegon(int x, int y) {
-    return analog_stick_map_x_to_octegon(x, y);
+    return analog_stick_map_x_to_octegon(y, x);
 }
 
 static int analog_stick_map_x_to_circle(int x, int y) {
@@ -94,7 +109,7 @@ void handle_analog_stick(struct analog_stick *stick,
                          struct analog_stick_config *config,
                          struct xwii_event *ev,
                          int stick_index,
-                         int state,
+                         unsigned int state,
                          InputInfoPtr info)
 {
   int x;
@@ -102,7 +117,7 @@ void handle_analog_stick(struct analog_stick *stick,
 
   int mapped_x;
   int mapped_y;
-
+  
   x = ev->v.abs[stick_index].x;
   y = ev->v.abs[stick_index].y;
 
