@@ -285,8 +285,15 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
       break;
     case WIIMOTE_MOTION_SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device, 
-        IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
-        IR_CONTINUOUS_SCROLL_BORDER, IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
+        IR_MIN_X, IR_MAX_X,
+        IR_MIN_Y, IR_MAX_Y);
+/* TODO
+      ret = xwiimote_prepare_abs(dev, device, 
+        IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER,
+        IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER,
+        IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER,
+        IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER);
+*/
       break;
     default:
       ret = Success;
@@ -427,11 +434,9 @@ static void xwiimote_input(int fd, pointer data)
 
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
-        if(!xwii_iface_open(dev->iface, dev->ifs))
+        if(!xwii_iface_open(dev->iface, xwii_iface_available(dev->iface)))
           xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
-        if (xwii_iface_available(dev->iface) & XWII_IFACE_NUNCHUK)
-          xwii_iface_open(dev->iface, XWII_IFACE_NUNCHUK);
-				break;
+        break;
 			case XWII_EVENT_KEY:
         keycode = xwii_key_to_wiimote_key(ev.v.key.code, info);
         layout = calculate_next_key_layout(&wiimote->keys[keycode], ir_is_active);
@@ -637,6 +642,7 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .avg_min_samples = IR_AVG_MIN_SAMPLES,
       .avg_weight = IR_AVG_WEIGHT,
       .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
+
       .continuous_scroll_border = IR_CONTINUOUS_SCROLL_BORDER,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,

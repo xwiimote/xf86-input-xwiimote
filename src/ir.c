@@ -50,7 +50,7 @@ static void calculate_ir_coordinates(struct ir *ir,
                                      struct xwii_event *ev,
                                      InputInfoPtr info)
 {
-	struct xwii_event_abs *a, *b, *c, d = {0};
+	struct xwii_event_abs *a, *b, *c, d;
 	int i, dists[6];
 
 	/* Grab first two valid points */
@@ -67,12 +67,12 @@ static void calculate_ir_coordinates(struct ir *ir,
 				 * closest to the reference points. */
 				d.x = ir->ref_x + ir->vec_x;
 				d.y = ir->ref_y + ir->vec_y;
-				dists[0] = XWIIMOTE_DISTSQ(c->x, c->y, ir->ref_x, ir->ref_y);
-				dists[1] = XWIIMOTE_DISTSQ(c->x, c->y, d.x, d.y);
-				dists[2] = XWIIMOTE_DISTSQ(a->x, a->y, ir->ref_x, ir->ref_y);
-				dists[3] = XWIIMOTE_DISTSQ(a->x, a->y, d.x, d.y);
-				dists[4] = XWIIMOTE_DISTSQ(b->x, b->y, ir->ref_x, ir->ref_y);
-				dists[5] = XWIIMOTE_DISTSQ(b->x, b->y, d.x, d.y);
+				dists[0] = IR_DISTSQ(c->x, c->y, ir->ref_x, ir->ref_y);
+				dists[1] = IR_DISTSQ(c->x, c->y, d.x, d.y);
+				dists[2] = IR_DISTSQ(a->x, a->y, ir->ref_x, ir->ref_y);
+				dists[3] = IR_DISTSQ(a->x, a->y, d.x, d.y);
+				dists[4] = IR_DISTSQ(b->x, b->y, ir->ref_x, ir->ref_y);
+				dists[5] = IR_DISTSQ(b->x, b->y, d.x, d.y);
 				if (dists[1] < dists[0]) dists[0] = dists[1];
 				if (dists[3] < dists[2]) dists[2] = dists[3];
 				if (dists[5] < dists[4]) dists[4] = dists[5];
@@ -96,8 +96,8 @@ static void calculate_ir_coordinates(struct ir *ir,
 		b = &d;
 		b->x = a->x - ir->vec_x;
 		b->y = a->y - ir->vec_y;
-		if (XWIIMOTE_DISTSQ(a->x, a->y, ir->ref_x, ir->ref_y)
-				< XWIIMOTE_DISTSQ(b->x, b->y, ir->ref_x, ir->ref_y)) {
+		if (IR_DISTSQ(a->x, a->y, ir->ref_x, ir->ref_y)
+				< IR_DISTSQ(b->x, b->y, ir->ref_x, ir->ref_y)) {
 			b->x = a->x + ir->vec_x;
 			b->y = a->y + ir->vec_y;
 			ir->ref_x = a->x;
@@ -123,7 +123,7 @@ static void calculate_ir_coordinates(struct ir *ir,
 	ir->avg_y = (ir->avg_y * ir->avg_count + a->y) / (ir->avg_count+1);
 	if (++ir->avg_count > config->avg_max_samples)
 		ir->avg_count = config->avg_max_samples;
-	if (XWIIMOTE_DISTSQ(a->x, a->y, ir->avg_x, ir->avg_y)
+	if (IR_DISTSQ(a->x, a->y, ir->avg_x, ir->avg_y)
 			< config->avg_radius * config->avg_radius) {
 		if (ir->avg_count >= config->avg_min_samples) {
 			a->x = (a->x + ir->avg_x * config->avg_weight) / (config->avg_weight+1);
@@ -133,7 +133,7 @@ static void calculate_ir_coordinates(struct ir *ir,
 		ir->avg_count = 0;
 	}
 
-  ir->x = a->x;
+  ir->x = IR_MAX_X - a->x;
   ir->y = a->y;
 	ir->last_valid_event = ev->time;
 }
@@ -145,9 +145,10 @@ static void handle_absolute_position(struct ir *ir,
 {
   /* Absolute scrolling */
   {
+/*TODO
     int x, y;
 
-    /* Calculate the absolute x value */
+    // Calculate the absolute x value 
     x = IR_MAX_X - ir->x;
     if (x < config->continuous_scroll_border) {
       x = config->continuous_scroll_border;
@@ -155,15 +156,18 @@ static void handle_absolute_position(struct ir *ir,
       x = IR_MAX_X - config->continuous_scroll_border;
     }
 
-    /* Calculate the absolute y value */
+    // Calculate the absolute y value 
     y = ir->y;
     if (y < config->continuous_scroll_border) {
       y = config->continuous_scroll_border;
     } else if (y > IR_MAX_Y - config->continuous_scroll_border) {
       y = IR_MAX_Y - config->continuous_scroll_border;
     }
+*/
 
+    xf86PostMotionEvent(info->dev, 1, 0, 2, (int) ir->x, (int) ir->y);
     /* Moves cursor smoothly to the point pointed at with a transition */
+/*
     {
       double distance;
       double ratio;
@@ -193,6 +197,7 @@ static void handle_absolute_position(struct ir *ir,
     }
 
     xf86PostMotionEvent(info->dev, 1, 0, 2, (int) ir->smooth_scroll_x, (int) ir->smooth_scroll_y);
+*/
   }
 }
 
@@ -248,7 +253,7 @@ void handle_ir(struct ir *ir,
 {
   calculate_ir_coordinates(ir, config, ev, info);
   handle_absolute_position(ir, config, ev, info);
-  handle_continuous_scrolling(ir, config, ev, info);
+  //handle_continuous_scrolling(ir, config, ev, info);
 }
 
 
@@ -262,39 +267,56 @@ static void parse_scale(const char *t, int *out)
 
 
 void configure_ir(struct ir_config *config, 
-                  char const *name,
+                  char const *prefix,
                   InputInfoPtr info)
 {
 	const char *t;
-
-	t = xf86FindOptionValue(info->options, "IRAvgRadius");
+  char option_key[100];
+ 
+  snprintf(option_key, sizeof(option_key), "%sIRAvgRadius", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->avg_radius);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_radius);
 
-	t = xf86FindOptionValue(info->options, "IRAvgMaxSamples");
+  snprintf(option_key, sizeof(option_key), "%sIRAvgMaxSamples", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->avg_max_samples);
 	if (config->avg_max_samples < 1) config->avg_max_samples = 1;
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_max_samples);
 
-	t = xf86FindOptionValue(info->options, "IRAvgMinSamples");
+  snprintf(option_key, sizeof(option_key), "%sIRAvgMinSamples", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->avg_min_samples);
 	if (config->avg_min_samples < 1) {
 		config->avg_min_samples = 1;
 	} else if (config->avg_min_samples > config->avg_max_samples) {
 		config->avg_min_samples = config->avg_max_samples;
 	}
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_min_samples);
 
-	t = xf86FindOptionValue(info->options, "IRAvgWeight");
+  snprintf(option_key, sizeof(option_key), "%sIRAvgWeight", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->avg_weight);
 	if (config->avg_weight < 0) config->avg_weight = 0;
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_weight);
 
-	t = xf86FindOptionValue(info->options, "IRKeymapExpirySecs");
+  snprintf(option_key, sizeof(option_key), "%sIRKeymapExpirySecs", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->keymap_expiry_secs);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->keymap_expiry_secs);
 
-	t = xf86FindOptionValue(info->options, "IRContinuousScrollBorder");
+  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorder", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->continuous_scroll_border);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border);
 
-	t = xf86FindOptionValue(info->options, "IRContinuousScrollMaxX");
+  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollMaxX", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->continuous_scroll_max_x);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_x);
 
-	t = xf86FindOptionValue(info->options, "IRContinuousScrollMaxY");
+  snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollMaxY", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->continuous_scroll_max_y);
+  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_y);
 }

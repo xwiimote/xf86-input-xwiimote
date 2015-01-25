@@ -12,14 +12,15 @@
 #define IR_CONTINUOUS_SCROLL_BORDER 20
 #define IR_CONTINUOUS_SCROLL_MAX_X 10
 #define IR_CONTINUOUS_SCROLL_MAX_Y 10
+#define IR_MIN_Y 0
 #define IR_MAX_Y 767
+#define IR_MIN_X 0
 #define IR_MAX_X 1023
 #define IR_SMOOTH_SCROLL_DELTA 1.0
 
 #define IR_KEYMAP_EXPIRY_SECS 1
 
-#define XWIIMOTE_DISTSQ(ax, ay, bx, by) \
-	((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
+#define IR_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
 struct ir {
 	struct timeval last_valid_event;
