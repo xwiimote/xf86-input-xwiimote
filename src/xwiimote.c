@@ -289,10 +289,10 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
       break;
     case WIIMOTE_MOTION_SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device,
-        IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER_X,
-        IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER_X,
-        IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER_Y,
-        IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER_Y);
+        (IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER_X) * 3,
+        (IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER_X) * 3,
+        (IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER_Y) * 3,
+        (IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER_Y) * 3);
       break;
     default:
       ret = Success;
@@ -435,20 +435,20 @@ static void xwiimote_input(int fd, pointer data)
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
         if(!xwii_iface_open(dev->iface, xwii_iface_available(dev->iface)))
-          xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
+          xf86IDrvMsg(info, X_INFO, "Cannot open all requested interfaces\n");
         break;
 			case XWII_EVENT_KEY:
         keycode = xwii_key_to_wiimote_key(ev.v.key.code, info);
         layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
         state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_key(wiimote, wiimote_config, &ev, state, dev->info);
+				handle_wiimote_key(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_ACCEL:
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, dev->info);
+				handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_IR:
         switch(dev->motion_layout) {
@@ -461,27 +461,25 @@ static void xwiimote_input(int fd, pointer data)
             break;
         }
         wiimote_config = &dev->wiimote_config[dev->motion_layout];
-				handle_wiimote_ir(wiimote, wiimote_config, &ev, state, dev->info);
+				handle_wiimote_ir(wiimote, wiimote_config, &ev, state, info);
 			case XWII_EVENT_MOTION_PLUS:
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, dev->info);
+				handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_NUNCHUK_KEY:
         keycode = xwii_key_to_nunchuk_key(ev.v.key.code, info);
         layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
         state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
-				handle_nunchuk_key(nunchuk, nunchuk_config, &ev, state, dev->info);
+				handle_nunchuk_key(nunchuk, nunchuk_config, &ev, state, info);
 				break;
 			case XWII_EVENT_NUNCHUK_MOVE:
         layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, dev->motion_layout);
         state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
-        wiimote_config = &dev->wiimote_config[layout];
-        handle_continuous_scrolling (&wiimote->ir, &wiimote_config->ir, &ev, info); 
-				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, dev->info);
+				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, info);
 				break;
 		}
 	} while (!ret);

@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <xf86.h>
+#include <xf86_OSproc.h>
 
 #include "ir.h"
 
@@ -166,70 +167,27 @@ static void handle_absolute_position(struct ir *ir,
   // Calculate the absolute y value 
   y = ir->y;
 
-  if (ir->lock_x && (
-    (ir->smooth_scroll_x < IR_MAX_X / 2 && ir->previous_smooth_scroll_x > IR_MAX_X / 2) ||
-    (ir->smooth_scroll_x > IR_MAX_X / 2 && ir->previous_smooth_scroll_x < IR_MAX_X / 2))) {
-    ir->lock_x = FALSE;
-  }
-
-  if (ir->lock_y && (
-    (ir->smooth_scroll_y < IR_MAX_Y / 2 && ir->previous_smooth_scroll_y > IR_MAX_Y / 2) ||
-    (ir->smooth_scroll_y > IR_MAX_Y / 2 && ir->previous_smooth_scroll_y < IR_MAX_Y / 2))) {
-    ir->lock_y = FALSE;
-  }
-
-  if (!ir->lock_x) {
-    ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
-  }
-
-  if (!ir->lock_y) {
-    ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
-  }
+  ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
+  ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
 
   /* Moves cursor smoothly to the point pointed at with a transition */
   {
-    double distance;
-
-    distance = sqrt(pow(x, 2) + pow(y, 2));
-
-    if (distance < config->smooth_scroll_delta || config->smooth_scroll_delta <= 0) {
-        ir->smooth_scroll_x = x;
-        ir->smooth_scroll_y = y;
-    }
-    else {
-      double x_delta = x - ir->smooth_scroll_x;
-      double y_delta = y - ir->smooth_scroll_y;
-      double ratio = config->smooth_scroll_delta/distance;
-      if ((int) x_delta && (int) y_delta) {
-        ir->smooth_scroll_x += x_delta * ratio;
-        ir->smooth_scroll_y += y_delta * ratio;
-      } else if ((int) x_delta) {
-        ir->smooth_scroll_x += x_delta * ratio;
-      } else if ((int) y_delta) {
-        ir->smooth_scroll_y += y_delta * ratio;
-      } 
-    }
+    ir->smooth_scroll_x = ir->x;
+    ir->smooth_scroll_y = ir->y;
 
     x = ir->smooth_scroll_x - ir->previous_smooth_scroll_x;
     y = ir->smooth_scroll_y - ir->previous_smooth_scroll_y;
 
-    if (!ir->lock_x) {
-      if (ir->smooth_scroll_x > (config->continuous_scroll_border_x + IR_DEADZONE_BORDER) &&
-          ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border_x - IR_DEADZONE_BORDER)) {
-        xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
-      }
+    if (ir->smooth_scroll_x > (config->continuous_scroll_border_x + IR_DEADZONE_BORDER) &&
+        ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border_x - IR_DEADZONE_BORDER)) {
+      xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
     }
 
-    if (!ir->lock_y) {
-      if (ir->smooth_scroll_y > (config->continuous_scroll_border_y + IR_DEADZONE_BORDER) &&
-          ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border_y - IR_DEADZONE_BORDER)) {
-        xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
-      }
+    if (ir->smooth_scroll_y > (config->continuous_scroll_border_y + IR_DEADZONE_BORDER) &&
+        ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border_y - IR_DEADZONE_BORDER)) {
+      xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
     }
-
-    //xf86IDrvMsg(info, X_INFO, "smooth scroll (%d, %d)\n", x, y);
   }
-
 }
 
 
@@ -238,7 +196,6 @@ void handle_continuous_scrolling(struct ir *ir,
                                  struct xwii_event *ev,
                                  InputInfoPtr info)
 {
-  int scroll_x, scroll_y;
   double x_scale, y_scale;
   double x, y;
 
@@ -246,39 +203,58 @@ void handle_continuous_scrolling(struct ir *ir,
   x = ir->smooth_scroll_x;
   x_scale = (double) config->continuous_scroll_max_x / (double) config->continuous_scroll_border_x;
   if (x < config->continuous_scroll_border_x) {
-    ir->continuous_scroll_subpixel_x += (x - config->continuous_scroll_border_x) * x_scale;
+    ir->continuous_scroll_speed_x = (x - config->continuous_scroll_border_x) * x_scale;
   } else if (x > IR_MAX_X - config->continuous_scroll_border_x) {
-    ir->continuous_scroll_subpixel_x += (x - (IR_MAX_X - config->continuous_scroll_border_x)) * x_scale;
+    ir->continuous_scroll_speed_x = (x - (IR_MAX_X - config->continuous_scroll_border_x)) * x_scale;
   } else {
-    ir->continuous_scroll_subpixel_x = 0;
+    ir->continuous_scroll_speed_x = 0;
   }
-  scroll_x = (int) ir->continuous_scroll_subpixel_x;
-  ir->continuous_scroll_subpixel_x -= scroll_x; 
-  ir->relative_offset_x += scroll_x;
 
   /* Y */
   y = ir->smooth_scroll_y;
   y_scale = (double) config->continuous_scroll_max_y / (double) config->continuous_scroll_border_y;
   if (y < config->continuous_scroll_border_y) {
-    ir->continuous_scroll_subpixel_y += (y - config->continuous_scroll_border_y) * y_scale;
+    ir->continuous_scroll_speed_y = (y - config->continuous_scroll_border_y) * y_scale;
   } else if (y > IR_MAX_Y - config->continuous_scroll_border_y) {
-    ir->continuous_scroll_subpixel_y += (y - (IR_MAX_Y - config->continuous_scroll_border_y)) * y_scale;
+    ir->continuous_scroll_speed_y = (y - (IR_MAX_Y - config->continuous_scroll_border_y)) * y_scale;
   } else {
-    ir->continuous_scroll_subpixel_y = 0;
+    ir->continuous_scroll_speed_y = 0;
   }
-  scroll_y = (int) ir->continuous_scroll_subpixel_y;
-  ir->continuous_scroll_subpixel_y -= scroll_y; 
-  ir->relative_offset_y += scroll_y;
+}
 
-  if (scroll_x) {
-    xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) (scroll_x));
-    ir->lock_x = TRUE;
-  }
 
-  if (scroll_y) {
-    xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) (scroll_y));
-    ir->lock_y = TRUE;
-  }
+static CARD32
+continuousScrollTimer(OsTimerPtr        timer,
+                      CARD32            atime,
+                      pointer           arg)
+{
+    struct ir *ir;
+    int sigstate;
+    int x, y;
+
+    ir = arg;
+    sigstate = xf86BlockSIGIO();
+
+    ir->continuous_scroll_subpixel_x += ir->continuous_scroll_speed_x;
+    x = (int) ir->continuous_scroll_subpixel_x;
+    ir->continuous_scroll_subpixel_x -= x; 
+
+    ir->continuous_scroll_subpixel_y += ir->continuous_scroll_speed_y;
+    y = (int) ir->continuous_scroll_subpixel_y;
+    ir->continuous_scroll_subpixel_y -= y; 
+
+    if (x) {
+      xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) (x));
+      //ir->lock_x = TRUE;
+    }
+
+    if (y) {
+      xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) (y));
+      //ir->lock_y = TRUE;
+    }
+
+    xf86UnblockSIGIO (sigstate);
+    return 1;
 }
 
 
@@ -289,6 +265,15 @@ void handle_ir(struct ir *ir,
 {
   calculate_ir_coordinates(ir, config, ev, info);
   handle_absolute_position(ir, config, ev, info);
+  if (!ir->timer) {
+    ir->info = info;
+    ir->timer = TimerSet(
+          ir->timer,
+          0,         /* Relative */
+          1,         /* What about NOW? */
+          continuousScrollTimer,
+          ir);
+  }
 }
 
 

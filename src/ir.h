@@ -9,11 +9,11 @@
 #define IR_AVG_MAX_SAMPLES 8
 #define IR_AVG_MIN_SAMPLES 4
 #define IR_AVG_WEIGHT 3
-#define IR_DEADZONE_BORDER 10
-#define IR_CONTINUOUS_SCROLL_BORDER_X 100
-#define IR_CONTINUOUS_SCROLL_BORDER_Y 0
-#define IR_CONTINUOUS_SCROLL_MAX_X 5
-#define IR_CONTINUOUS_SCROLL_MAX_Y 5
+#define IR_DEADZONE_BORDER 0
+#define IR_CONTINUOUS_SCROLL_BORDER_X 200
+#define IR_CONTINUOUS_SCROLL_BORDER_Y 20
+#define IR_CONTINUOUS_SCROLL_MAX_X 2
+#define IR_CONTINUOUS_SCROLL_MAX_Y 2
 #define IR_MIN_Y 0
 #define IR_MAX_Y 767
 #define IR_MIN_X 0
@@ -37,11 +37,11 @@ struct ir {
   int x;
   int y;
 
+  double continuous_scroll_speed_x;
+  double continuous_scroll_speed_y;
   double continuous_scroll_subpixel_x;
   double continuous_scroll_subpixel_y;
 
-  double relative_offset_y;
-  double relative_offset_x;
   double smooth_scroll_x;
   double smooth_scroll_y;
   double previous_smooth_scroll_x;
@@ -49,6 +49,9 @@ struct ir {
 
   BOOL lock_x;
   BOOL lock_y;
+
+  OsTimerPtr timer;
+  InputInfoPtr info;
 };
 
 struct ir_config {

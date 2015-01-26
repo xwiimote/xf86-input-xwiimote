@@ -166,6 +166,7 @@ void handle_wiimote_ir(struct wiimote *wiimote,
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
   handle_ir(&wiimote->ir, &config->ir, ev, info);
+  handle_continuous_scrolling (&wiimote->ir, &config->ir, ev, info); 
 }
 
 void handle_wiimote_motionplus(struct wiimote *wiimote,
