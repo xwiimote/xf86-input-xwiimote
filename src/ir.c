@@ -154,9 +154,9 @@ static void calculate_ir_coordinates(struct ir *ir,
 }
 
 static void handle_menu_position(struct ir *ir,
-                                     struct ir_config *config,
-                                     struct xwii_event *ev,
-                                     InputInfoPtr info)
+                                 struct ir_config *config,
+                                 struct xwii_event *ev,
+                                 InputInfoPtr info)
 {
   int x, y;
 
@@ -212,7 +212,6 @@ continuousScrollTimer(OsTimerPtr        timer,
   struct ir *ir;
   int sigstate;
   int x, y;
-  double delta;
 
   ir = arg;
   if (ir->mode != IR_MODE_GAME) {
@@ -227,17 +226,28 @@ continuousScrollTimer(OsTimerPtr        timer,
   //Handle the pointer position
 
   {
+    double delta_x, delta_y, delta_h, ratio;
+    double MAX_DELTA = 10;
+
     ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
     ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
 
-    delta = ((double) ir->x - (double) ir->previous_smooth_scroll_x);
-    ir->smooth_scroll_x = ir->previous_smooth_scroll_x + delta;
+    delta_x = ((double) ir->x - (double) ir->previous_smooth_scroll_x);
+    delta_y = ((double) ir->y - (double) ir->previous_smooth_scroll_y);
 
-    xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta);
+    if (delta_x != 0 || delta_y != 0) {
+      delta_h = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+      ratio = MAX_DELTA / delta_h;
+      if (ratio < 1) {
+        delta_x *= ratio;
+        delta_y *= ratio;
+      }
+      ir->smooth_scroll_x = ir->previous_smooth_scroll_x + delta_x;
+      ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta_y;
 
-    delta = ((double) ir->y - (double) ir->previous_smooth_scroll_y);
-    ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta;
-    xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta);
+      xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta_x);
+      xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta_y);
+    }  
   }
 
   //Handle the continuous edge scrolling
