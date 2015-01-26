@@ -11,9 +11,9 @@
 #define IR_AVG_WEIGHT 3
 #define IR_DEADZONE_BORDER 0
 #define IR_CONTINUOUS_SCROLL_BORDER_X 300
-#define IR_CONTINUOUS_SCROLL_BORDER_Y 20
+#define IR_CONTINUOUS_SCROLL_BORDER_Y 50
 #define IR_CONTINUOUS_SCROLL_MAX_X 4
-#define IR_CONTINUOUS_SCROLL_MAX_Y 1
+#define IR_CONTINUOUS_SCROLL_MAX_Y 2
 #define IR_MIN_Y 0
 #define IR_MAX_Y 767
 #define IR_MIN_X 0
@@ -42,6 +42,11 @@ struct ir {
 
   int x;
   int y;
+
+  double menu_x;
+  double menu_y;
+  double previous_menu_x;
+  double previous_menu_y;
 
   double continuous_scroll_speed_x;
   double continuous_scroll_speed_y;

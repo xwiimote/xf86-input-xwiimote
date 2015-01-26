@@ -153,22 +153,6 @@ static void calculate_ir_coordinates(struct ir *ir,
 	ir->last_valid_event = ev->time;
 }
 
-static void handle_menu_position(struct ir *ir,
-                                 struct ir_config *config,
-                                 struct xwii_event *ev,
-                                 InputInfoPtr info)
-{
-  int x, y;
-
-  if (ir->mode != IR_MODE_MENU) return;
-
-  x = ir->x;
-  y = ir->y;
-
-  xf86IDrvMsg(info, X_INFO, "(%d %d)\n", x, y);
-
-  xf86PostMotionEvent(info->dev, Absolute, 0, 2, (int) x * IR_TO_SCREEN_RATIO, (int) y * IR_TO_SCREEN_RATIO);
-}
 
 void handle_continuous_scrolling(struct ir *ir,
                                  struct ir_config *config,
@@ -214,12 +198,6 @@ continuousScrollTimer(OsTimerPtr        timer,
   int x, y;
 
   ir = arg;
-  if (ir->mode != IR_MODE_GAME) {
-    ir->timer = NULL;
-    return 0;
-  }
-
-  xf86IDrvMsg(ir->info, X_INFO, "timer\n");
 
   sigstate = xf86BlockSIGIO();
 
@@ -227,7 +205,13 @@ continuousScrollTimer(OsTimerPtr        timer,
 
   {
     double delta_x, delta_y, delta_h, ratio;
-    double MAX_DELTA = 10;
+    double MAX_DELTA;
+
+    if (ir->mode == IR_MODE_GAME) {
+      MAX_DELTA = 8;
+    } else {
+      MAX_DELTA = 3;
+    }
 
     ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
     ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
@@ -245,8 +229,12 @@ continuousScrollTimer(OsTimerPtr        timer,
       ir->smooth_scroll_x = ir->previous_smooth_scroll_x + delta_x;
       ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta_y;
 
-      xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta_x);
-      xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta_y);
+      if (ir->mode == IR_MODE_GAME) {
+        xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta_x);
+        xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta_y);
+      } else {
+        xf86PostMotionEvent(ir->info->dev, Absolute, 0, 2, (int) ir->smooth_scroll_x * IR_TO_SCREEN_RATIO, (int) ir->smooth_scroll_y * IR_TO_SCREEN_RATIO);
+      }
     }  
   }
 
@@ -281,7 +269,6 @@ void handle_ir(struct ir *ir,
                InputInfoPtr info)
 {
   calculate_ir_coordinates(ir, config, ev, info);
-  handle_menu_position(ir, config, ev, info);
   handle_continuous_scrolling (ir, config, ev, info); 
 
   if (!ir->timer) {
