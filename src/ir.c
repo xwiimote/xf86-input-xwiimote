@@ -153,43 +153,22 @@ static void calculate_ir_coordinates(struct ir *ir,
 	ir->last_valid_event = ev->time;
 }
 
-static void handle_absolute_position(struct ir *ir,
+static void handle_menu_position(struct ir *ir,
                                      struct ir_config *config,
                                      struct xwii_event *ev,
                                      InputInfoPtr info)
 {
-  /* Absolute scrolling */
   int x, y;
 
-  // Calculate the absolute x value 
-  x = ir->x;
+  if (ir->mode != IR_MODE_MENU) return;
 
-  // Calculate the absolute y value 
+  x = ir->x;
   y = ir->y;
 
-  ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
-  ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
+  xf86IDrvMsg(info, X_INFO, "(%d %d)\n", x, y);
 
-  /* Moves cursor smoothly to the point pointed at with a transition */
-  {
-    ir->smooth_scroll_x = ir->x;
-    ir->smooth_scroll_y = ir->y;
-
-    x = ir->smooth_scroll_x - ir->previous_smooth_scroll_x;
-    y = ir->smooth_scroll_y - ir->previous_smooth_scroll_y;
-
-    if (ir->smooth_scroll_x > (config->continuous_scroll_border_x + IR_DEADZONE_BORDER) &&
-        ir->smooth_scroll_x < (IR_MAX_X - config->continuous_scroll_border_x - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Relative, 0, 1, (int) x);
-    }
-
-    if (ir->smooth_scroll_y > (config->continuous_scroll_border_y + IR_DEADZONE_BORDER) &&
-        ir->smooth_scroll_y < (IR_MAX_Y - config->continuous_scroll_border_y - IR_DEADZONE_BORDER)) {
-      xf86PostMotionEvent(info->dev, Relative, 1, 1, (int) y);
-    }
-  }
+  xf86PostMotionEvent(info->dev, Absolute, 0, 2, (int) x * IR_TO_SCREEN_RATIO, (int) y * IR_TO_SCREEN_RATIO);
 }
-
 
 void handle_continuous_scrolling(struct ir *ir,
                                  struct ir_config *config,
@@ -198,6 +177,8 @@ void handle_continuous_scrolling(struct ir *ir,
 {
   double x_scale, y_scale;
   double x, y;
+
+  if (ir->mode != IR_MODE_GAME) return;
 
   /* X */
   x = ir->smooth_scroll_x;
@@ -228,13 +209,39 @@ continuousScrollTimer(OsTimerPtr        timer,
                       CARD32            atime,
                       pointer           arg)
 {
-    struct ir *ir;
-    int sigstate;
-    int x, y;
+  struct ir *ir;
+  int sigstate;
+  int x, y;
+  double delta;
 
-    ir = arg;
-    sigstate = xf86BlockSIGIO();
+  ir = arg;
+  if (ir->mode != IR_MODE_GAME) {
+    ir->timer = NULL;
+    return 0;
+  }
 
+  xf86IDrvMsg(ir->info, X_INFO, "timer\n");
+
+  sigstate = xf86BlockSIGIO();
+
+  //Handle the pointer position
+
+  {
+    ir->previous_smooth_scroll_x = ir->smooth_scroll_x;
+    ir->previous_smooth_scroll_y = ir->smooth_scroll_y;
+
+    delta = ((double) ir->x - (double) ir->previous_smooth_scroll_x);
+    ir->smooth_scroll_x = ir->previous_smooth_scroll_x + delta;
+
+    xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta);
+
+    delta = ((double) ir->y - (double) ir->previous_smooth_scroll_y);
+    ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta;
+    xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta);
+  }
+
+  //Handle the continuous edge scrolling
+  {
     ir->continuous_scroll_subpixel_x += ir->continuous_scroll_speed_x;
     x = (int) ir->continuous_scroll_subpixel_x;
     ir->continuous_scroll_subpixel_x -= x; 
@@ -245,16 +252,16 @@ continuousScrollTimer(OsTimerPtr        timer,
 
     if (x) {
       xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) (x));
-      //ir->lock_x = TRUE;
     }
 
     if (y) {
       xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) (y));
-      //ir->lock_y = TRUE;
     }
+  }
 
-    xf86UnblockSIGIO (sigstate);
-    return 1;
+  xf86UnblockSIGIO (sigstate);
+
+  return 1;
 }
 
 
@@ -264,13 +271,15 @@ void handle_ir(struct ir *ir,
                InputInfoPtr info)
 {
   calculate_ir_coordinates(ir, config, ev, info);
-  handle_absolute_position(ir, config, ev, info);
+  handle_menu_position(ir, config, ev, info);
+  handle_continuous_scrolling (ir, config, ev, info); 
+
   if (!ir->timer) {
     ir->info = info;
     ir->timer = TimerSet(
           ir->timer,
-          0,         /* Relative */
-          1,         /* What about NOW? */
+          0,         
+          1,         
           continuousScrollTimer,
           ir);
   }
@@ -346,3 +355,10 @@ void configure_ir(struct ir_config *config,
   xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_y);
 }
 
+
+void close_ir(struct ir *ir) {
+  if (ir->timer != NULL) {
+    TimerCancel(ir->timer);
+    ir->timer = NULL;
+  }
+}

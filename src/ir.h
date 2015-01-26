@@ -10,7 +10,7 @@
 #define IR_AVG_MIN_SAMPLES 4
 #define IR_AVG_WEIGHT 3
 #define IR_DEADZONE_BORDER 0
-#define IR_CONTINUOUS_SCROLL_BORDER_X 200
+#define IR_CONTINUOUS_SCROLL_BORDER_X 300
 #define IR_CONTINUOUS_SCROLL_BORDER_Y 20
 #define IR_CONTINUOUS_SCROLL_MAX_X 2
 #define IR_CONTINUOUS_SCROLL_MAX_Y 2
@@ -18,13 +18,19 @@
 #define IR_MAX_Y 767
 #define IR_MIN_X 0
 #define IR_MAX_X 1023
-#define IR_SMOOTH_SCROLL_DELTA 100.0
+#define IR_TO_SCREEN_RATIO 3
 
 #define IR_KEYMAP_EXPIRY_SECS 1
 
 #define IR_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
+enum ir_mode {
+  IR_MODE_MENU,
+  IR_MODE_GAME,
+};
+
 struct ir {
+  unsigned int mode;
 	struct timeval last_valid_event;
 	int vec_x;
 	int vec_y;
@@ -47,9 +53,6 @@ struct ir {
   double previous_smooth_scroll_x;
   double previous_smooth_scroll_y;
 
-  BOOL lock_x;
-  BOOL lock_y;
-
   OsTimerPtr timer;
   InputInfoPtr info;
 };
@@ -64,13 +67,13 @@ struct ir_config {
 	int continuous_scroll_border_y;
   int continuous_scroll_max_x;
   int continuous_scroll_max_y;
-  double smooth_scroll_delta;
 };
 
 
 BOOL ir_is_active(struct ir *ir, struct ir_config *config, struct xwii_event *ev);
 void configure_ir(struct ir_config *config, char const *name, InputInfoPtr info);
 void preinit_ir (struct ir_config *config);
+void close_ir(struct ir *ir);
 
 
 void handle_ir(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);

@@ -170,7 +170,7 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	char btn5[] = BTN_LABEL_PROP_BTN_WHEEL_DOWN;
 	unsigned char map[] = { 0, 1, 2, 3, 4, 5 };
 
-	num = 4;
+	num = 6;
 	atoms = malloc(sizeof(*atoms) * num);
 	if (!atoms)
 		return BadAlloc;
@@ -180,8 +180,8 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	atoms[1] = XIGetKnownProperty(btn1);
 	atoms[2] = XIGetKnownProperty(btn2);
 	atoms[3] = XIGetKnownProperty(btn3);
-	atoms[3] = XIGetKnownProperty(btn4);
-	atoms[3] = XIGetKnownProperty(btn5);
+	atoms[4] = XIGetKnownProperty(btn4);
+	atoms[5] = XIGetKnownProperty(btn5);
 
 	if (!InitButtonClassDeviceStruct(device, 1, atoms, map)) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init button class\n");
@@ -289,10 +289,10 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
       break;
     case WIIMOTE_MOTION_SOURCE_IR:
       ret = xwiimote_prepare_abs(dev, device,
-        (IR_MIN_X + IR_CONTINUOUS_SCROLL_BORDER_X) * 3,
-        (IR_MAX_X - IR_CONTINUOUS_SCROLL_BORDER_X) * 3,
-        (IR_MIN_Y + IR_CONTINUOUS_SCROLL_BORDER_Y) * 3,
-        (IR_MAX_Y - IR_CONTINUOUS_SCROLL_BORDER_Y) * 3);
+        (IR_MIN_X) * IR_TO_SCREEN_RATIO,
+        (IR_MAX_X) * IR_TO_SCREEN_RATIO,
+        (IR_MIN_Y) * IR_TO_SCREEN_RATIO,
+        (IR_MAX_Y) * IR_TO_SCREEN_RATIO);
       break;
     default:
       ret = Success;
@@ -307,6 +307,7 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+  close_wiimote(&dev->wiimote);
 	return Success;
 }
 
@@ -654,7 +655,6 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
-      .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
     },
     .accelerometer = {
     },
@@ -671,11 +671,11 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
-      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
-      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
-      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-      [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E, .ir_mode = KEY_IR_MODE_TOGGLE},
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC, .ir_mode = KEY_IR_MODE_TOGGLE},
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_IGNORE, .ir_mode = KEY_IR_MODE_TOGGLE },
       [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
       [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
     }
@@ -692,7 +692,6 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
-      .smooth_scroll_delta = IR_SMOOTH_SCROLL_DELTA,
     },
     .accelerometer = {
     },
@@ -709,11 +708,11 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
       [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
       [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
-      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
-      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E },
-      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-      [WIIMOTE_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_IGNORE, .ir_mode = KEY_IR_MODE_TOGGLE },
       [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
       [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
     }

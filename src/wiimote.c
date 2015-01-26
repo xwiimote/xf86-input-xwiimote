@@ -152,10 +152,33 @@ void handle_wiimote_key(struct wiimote *wiimote,
                         InputInfoPtr info)
 {
   unsigned int keycode;
+  unsigned int previous_state;
 
   keycode = xwii_key_to_wiimote_key(ev->v.key.code, info);
+  previous_state = wiimote->keys[keycode].state;
 
   handle_key(&wiimote->keys[keycode], &config->keys[keycode], state, info);
+
+  if (state && !previous_state) {
+    switch (config->keys[keycode].ir_mode) {
+      case KEY_IR_MODE_RELATIVE:
+          wiimote->ir.mode = IR_MODE_GAME;
+        break;
+      case KEY_IR_MODE_ABSOLUTE:
+        wiimote->ir.mode = IR_MODE_MENU;
+        break;
+      case KEY_IR_MODE_TOGGLE:
+        if (wiimote->ir.mode == IR_MODE_MENU) {
+          wiimote->ir.mode = IR_MODE_GAME;
+        } else if (wiimote->ir.mode == IR_MODE_GAME) {
+          wiimote->ir.mode = IR_MODE_MENU;
+        }
+        break;
+      default:
+      case KEY_IR_MODE_IGNORE:
+        break;
+    }
+  }
 }
 
 void handle_wiimote_ir(struct wiimote *wiimote,
@@ -166,7 +189,6 @@ void handle_wiimote_ir(struct wiimote *wiimote,
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
   handle_ir(&wiimote->ir, &config->ir, ev, info);
-  handle_continuous_scrolling (&wiimote->ir, &config->ir, ev, info); 
 }
 
 void handle_wiimote_motionplus(struct wiimote *wiimote,
@@ -194,3 +216,7 @@ void preinit_wiimote(struct wiimote_config *config) {
   preinit_motionplus(&config->motionplus);
 }
 
+
+void close_wiimote(struct wiimote *wiimote) {
+  close_ir(&wiimote->ir);
+}

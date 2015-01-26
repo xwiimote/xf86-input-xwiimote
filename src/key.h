@@ -17,6 +17,13 @@ enum key_type {
 	FUNC_KEY,
 };
 
+enum key_ir_mode {
+  KEY_IR_MODE_IGNORE,
+  KEY_IR_MODE_RELATIVE,
+  KEY_IR_MODE_ABSOLUTE,
+  KEY_IR_MODE_TOGGLE,
+};
+
 enum key_state {
   KEY_STATE_RELEASED = 0,
 	KEY_STATE_PRESSED,
@@ -30,6 +37,7 @@ struct key_config {
 		int btn;
 		unsigned int key;
 	} u;
+  unsigned int ir_mode;
 };
 
 struct key {

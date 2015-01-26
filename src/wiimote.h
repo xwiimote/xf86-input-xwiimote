@@ -47,6 +47,7 @@ struct wiimote_config {
   struct key_config keys[WIIMOTE_KEY_NUM];
 };
 
+void close_wiimote(struct wiimote *wiimote);
 void preinit_wiimote(struct wiimote_config *config);
 void configure_wiimote(struct wiimote_config *config, char const * prefix, struct wiimote_config *defaults, InputInfoPtr info);
 
