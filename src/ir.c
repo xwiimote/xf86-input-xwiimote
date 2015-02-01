@@ -189,13 +189,14 @@ void handle_continuous_scrolling(struct ir *ir,
 
 
 static CARD32
-continuousScrollTimer(OsTimerPtr        timer,
-                      CARD32            atime,
-                      pointer           arg)
+updateCursorPositionTimer(OsTimerPtr        timer,
+                          CARD32            atime,
+                          pointer           arg)
 {
   struct ir *ir;
   int sigstate;
   int x, y;
+  double delta_x, delta_y, delta_h, ratio;
 
   ir = arg;
 
@@ -204,7 +205,6 @@ continuousScrollTimer(OsTimerPtr        timer,
   //Handle the pointer position
 
   {
-    double delta_x, delta_y, delta_h, ratio;
     double MAX_DELTA;
 
     if (ir->mode == IR_MODE_GAME) {
@@ -230,8 +230,7 @@ continuousScrollTimer(OsTimerPtr        timer,
       ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta_y;
 
       if (ir->mode == IR_MODE_GAME) {
-        xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) delta_x);
-        xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) delta_y);
+        xf86PostMotionEvent(ir->info->dev, Relative, 0, 2, (int) delta_x, (int) delta_y);
       } else {
         xf86PostMotionEvent(ir->info->dev, Absolute, 0, 2, (int) ir->smooth_scroll_x * IR_TO_SCREEN_RATIO, (int) ir->smooth_scroll_y * IR_TO_SCREEN_RATIO);
       }
@@ -239,7 +238,7 @@ continuousScrollTimer(OsTimerPtr        timer,
   }
 
   //Handle the continuous edge scrolling
-  {
+  if (ir->mode == IR_MODE_GAME) {
     ir->continuous_scroll_subpixel_x += ir->continuous_scroll_speed_x;
     x = (int) ir->continuous_scroll_subpixel_x;
     ir->continuous_scroll_subpixel_x -= x; 
@@ -248,12 +247,8 @@ continuousScrollTimer(OsTimerPtr        timer,
     y = (int) ir->continuous_scroll_subpixel_y;
     ir->continuous_scroll_subpixel_y -= y; 
 
-    if (x) {
-      xf86PostMotionEvent(ir->info->dev, Relative, 0, 1, (int) (x));
-    }
-
-    if (y) {
-      xf86PostMotionEvent(ir->info->dev, Relative, 1, 1, (int) (y));
+    if (x || y) {
+      xf86PostMotionEvent(ir->info->dev, Relative, 0, 2, (int) (x), (int) (y));
     }
   }
 
@@ -277,7 +272,7 @@ void handle_ir(struct ir *ir,
           ir->timer,
           0,         
           1,         
-          continuousScrollTimer,
+          updateCursorPositionTimer,
           ir);
   }
 }
@@ -298,7 +293,7 @@ void configure_ir(struct ir_config *config,
 {
 	const char *t;
   char option_key[100];
- 
+
   snprintf(option_key, sizeof(option_key), "%sIRAvgRadius", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->avg_radius);

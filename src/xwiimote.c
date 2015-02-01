@@ -431,7 +431,7 @@ static void xwiimote_input(int fd, pointer data)
       dev->motion_layout = KEY_LAYOUT_IR;
     } else {
       dev->motion_layout = KEY_LAYOUT_DEFAULT;
-    }
+    } 
 
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
@@ -446,6 +446,16 @@ static void xwiimote_input(int fd, pointer data)
 				handle_wiimote_key(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_ACCEL:
+        //USE TO MAKE IT SO TILTING THE WIIMTOE DOESN'T EFFECT TRACKING
+        /*TODO 
+        xf86IDrvMsg(info, X_INFO, "accelerometer: (%d, %d, %d)\n", ev.v.abs[0].x, ev.v.abs[0].y, ev.v.abs[0].z); 
+
+        (-100, y, 0) is tilted left
+        (0, y, 100) is flat
+        (100, y, 0) is tilted right
+        (0, y, -100) is upside down
+
+        */
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
@@ -650,7 +660,6 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .avg_min_samples = IR_AVG_MIN_SAMPLES,
       .avg_weight = IR_AVG_WEIGHT,
       .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
-
       .continuous_scroll_border_x = IR_CONTINUOUS_SCROLL_BORDER_X,
       .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
@@ -894,6 +903,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		free(dev);
 		info->private = NULL;
 	}
+
 
 	xf86DeleteInput(info, flags);
 }

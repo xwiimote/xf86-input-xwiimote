@@ -220,3 +220,5 @@ void preinit_wiimote(struct wiimote_config *config) {
 void close_wiimote(struct wiimote *wiimote) {
   close_ir(&wiimote->ir);
 }
+
+
