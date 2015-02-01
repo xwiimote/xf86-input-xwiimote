@@ -36,7 +36,7 @@
 
 #include "properties.h"
 
-#define PROP_NAME_MODE "mode"
+#define PROP_NAME_MODE "Wii Remote Mode"
 static Atom prop_mode = 0;
 
 static int
@@ -47,11 +47,12 @@ xwiimote_set_property(DeviceIntPtr device, Atom atom, XIPropertyValuePtr val, BO
   int mode = -1;
 
   if (atom == prop_mode) {
-      if (val->size != 1 || val->format != 8 || val->type != XA_INTEGER)
+      xf86IDrvMsg(info, X_INFO, "trying to set prop with size: %d, format: %d, type: %d, data: %d, checkOnly: %d\n", (int) val->size, (int) val->format, (int) val->type, (int) *((INT32*)val->data), checkonly);
+      if (val->size != 1 || val->format != 32 || val->type != XA_INTEGER)
       {
           return BadMatch;
       }
-      switch(*((INT8*)val->data)) {
+      switch(*((INT32*)val->data)) {
         case IR_MODE_GAME:
           mode = IR_MODE_GAME;
           break;
@@ -75,10 +76,10 @@ xwiimote_initialize_properties(DeviceIntPtr device, struct xwiimote_dev *dev)
 
   /* Debug Level */
   prop_mode = MakeAtom(PROP_NAME_MODE, strlen(PROP_NAME_MODE), TRUE);
-  XIChangeDeviceProperty(device, prop_mode, XA_INTEGER, 8,
+  XIChangeDeviceProperty(device, prop_mode, XA_INTEGER, 32,
                               PropModeReplace, 1,
                               &dev->wiimote.ir.mode,
-                              FALSE);
+                              TRUE);
   XISetDevicePropertyDeletable(device, prop_mode, FALSE);
   return TRUE;
 }
