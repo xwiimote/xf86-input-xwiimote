@@ -180,14 +180,17 @@ out:
 int main(int argc, char* argv[]) {
   xcb_connection_t *connection = NULL;
 
-  connection = xcb_connect (NULL, NULL);
-  if (!connection) goto out;
+  while (1) {
+    connection = xcb_connect (NULL, NULL);
+    if (!connection) goto out;
 
-  sync_wiimote_mode(connection);
+    sync_wiimote_mode(connection);
 
 out:
 
-  if (connection) xcb_disconnect(connection);
+    if (connection) xcb_disconnect(connection);
+    sleep(1);
+  }
 
   return 0;
 }
