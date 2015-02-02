@@ -27,10 +27,12 @@
 #include "config.h"
 #endif
 
-#include <xorg-server.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
+
+#include <xorg-server.h>
 #include <xf86.h>
 #include <xf86_OSproc.h>
 

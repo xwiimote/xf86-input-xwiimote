@@ -3,8 +3,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
+
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
+
+#include <xorg-server.h>
+#include <xf86.h>
+#include <xf86_OSproc.h>
+
+#include "ir.h"
+
+
+/*
+TODO
+make accept a program as an option
+make help text
+*/
 
 
 static int _mode = 0;
@@ -78,6 +93,17 @@ static void set_wiimote_mode(xcb_connection_t *connection, int32_t mode) {
     if (mode == _mode) return;
 
     _mode = mode;
+    switch(_mode) {
+      case IR_MODE_GAME:
+        printf("Setting wiimotes to Game Mode\n");
+        break;
+      case IR_MODE_MENU:
+        printf("Setting wiimotes to Menu Mode\n");
+        break;
+      default:
+        printf("Setting wiimotes to %d Mode\n", _mode);
+        break;
+    }
 
     reply = get_input_devices(connection);
 
@@ -179,6 +205,14 @@ out:
 
 int main(int argc, char* argv[]) {
   xcb_connection_t *connection = NULL;
+  struct timespec req = {
+    .tv_sec = 0,
+    .tv_nsec = 100000000L,
+  };
+  struct timespec rem =  {
+    .tv_sec = 0,
+    .tv_nsec = 0,
+  };
 
   while (1) {
     connection = xcb_connect (NULL, NULL);
@@ -189,7 +223,7 @@ int main(int argc, char* argv[]) {
 out:
 
     if (connection) xcb_disconnect(connection);
-    sleep(1);
+    nanosleep(&req, &rem);
   }
 
   return 0;
