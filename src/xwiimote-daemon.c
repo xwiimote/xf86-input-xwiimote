@@ -3,13 +3,13 @@
 #include <stdio.h>
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
+#include <xcb/xfixes.h>
 
 
-void
+static void
 get_atom_names(xcb_connection_t *connection, xcb_atom_t atoms[], int len, char*** out) {
   xcb_get_atom_name_cookie_t *cookies = NULL;
   xcb_get_atom_name_reply_t *reply;
-  char *name = NULL;
   int i;
 
 
@@ -33,17 +33,14 @@ out:
 }
 
  
-xcb_input_list_input_devices_reply_t *
+static xcb_input_list_input_devices_reply_t *
 get_input_devices(xcb_connection_t *connection) {
   xcb_input_list_input_devices_cookie_t cookie;
-  xcb_input_device_info_iterator_t iter;
-  xcb_input_device_id_t input_device_id;
-
   cookie = xcb_input_list_input_devices(connection);
   return xcb_input_list_input_devices_reply(connection, cookie, NULL);
 }
 
-void
+static void
 get_device_properties(xcb_connection_t *connection, uint8_t device_id, xcb_atom_t **atoms, int *len) {
   xcb_input_list_device_properties_cookie_t cookie;
   xcb_input_list_device_properties_reply_t *reply;
@@ -65,14 +62,13 @@ get_device_properties(xcb_connection_t *connection, uint8_t device_id, xcb_atom_
   free(reply); reply = NULL;
 }
 
-void set_wiimote_mode(xcb_connection_t *connection, int32_t mode) {
+static void set_wiimote_mode(xcb_connection_t *connection, int32_t mode) {
     xcb_input_list_input_devices_reply_t *devices_reply;
     xcb_input_device_info_t *device;
     uint8_t device_id;
-    xcb_void_cookie_t cookie;
-    int len;
-    xcb_atom_t *atoms;
-    char **names;
+    xcb_atom_t *atoms = NULL;
+    int len = 0;
+    char **names = NULL;
     int i;
 
     devices_reply = get_input_devices(connection);
@@ -84,12 +80,12 @@ void set_wiimote_mode(xcb_connection_t *connection, int32_t mode) {
       while (devices_iter.rem) {
         device = devices_iter.data;
         device_id = device->device_id;
-        printf("%d\n", device_id);
         get_device_properties(connection, device_id, &atoms, &len);
         get_atom_names(connection, atoms, len, &names);
 
         for (i = 0; i < len; i++) {
           if (names[i] && !strcmp(names[i], "Wii Remote Mode")) {
+            printf("%d\n", device_id);
             printf("name: %s, atom: %d, deviceid %d, mode: %d\n", names[i], atoms[i], device_id, mode);
             xcb_input_change_device_property(
               connection,
@@ -117,15 +113,84 @@ void set_wiimote_mode(xcb_connection_t *connection, int32_t mode) {
 
 
 int main(int argc, char* argv[]) {
-    xcb_connection_t *connection;
+    xcb_connection_t    *connection;
+    xcb_screen_t        *screen;
+    xcb_window_t active_window;
+
     connection = xcb_connect (NULL, NULL);
+    screen = xcb_setup_roots_iterator (xcb_get_setup (connection)).data;
 
-    set_wiimote_mode(connection, 0);
+    {
+      xcb_query_pointer_cookie_t cookie;
+      xcb_query_pointer_reply_t *reply;
 
-    xcb_disconnect (connection);
-    connection = NULL;
+        // typedef struct xcb_query_pointer_reply_t {
+        //     uint8_t      response_type; /**<  */
+        //     uint8_t      same_screen; /**<  */
+        //     uint16_t     sequence; /**<  */
+        //     uint32_t     length; /**<  */
+        //     xcb_window_t root; /**<  */
+        //     xcb_window_t child; /**<  */
+        //     int16_t      root_x; /**<  */
+        //     int16_t      root_y; /**<  */
+        //     int16_t      win_x; /**<  */
+        //     int16_t      win_y; /**<  */
+        //     uint16_t     mask; /**<  */
+        //     uint8_t      pad0[2]; /**<  */
+        // } xcb_query_pointer_reply_t;
+
+        cookie = xcb_query_pointer(connection, screen->root); 
+        reply = xcb_query_pointer_reply(connection, cookie, NULL);
+        if (!reply) goto out;
+        if (reply->mask) return 0;
+        active_window = reply->child;
+    }
+
+    {
+        // typedef enum xcb_grab_status_t {
+        //     XCB_GRAB_STATUS_SUCCESS = 0,
+        //     XCB_GRAB_STATUS_ALREADY_GRABBED = 1,
+        //     XCB_GRAB_STATUS_INVALID_TIME = 2,
+        //     XCB_GRAB_STATUS_NOT_VIEWABLE = 3,
+        //     XCB_GRAB_STATUS_FROZEN = 4
+        // } xcb_grab_status_t;
+        // 
+        // typedef struct xcb_grab_pointer_reply_t {
+        //     uint8_t  response_type; /**<  */
+        //     uint8_t  status; /**<  */
+        //     uint16_t sequence; /**<  */
+        //     uint32_t length; /**<  */
+        // } xcb_grab_pointer_reply_t;
+
+        xcb_grab_pointer_cookie_t cookie;
+        xcb_grab_pointer_reply_t *reply;
+
+        cookie = xcb_grab_pointer(connection, 0, active_window, 0, 0, 0, active_window, XCB_NONE, XCB_CURRENT_TIME);
+        reply = xcb_grab_pointer_reply(connection, cookie, NULL);
+
+        switch(reply->status) {
+            case XCB_GRAB_STATUS_SUCCESS:
+                printf("%d Mouse Not Grabbed (must ungrab)!\n", reply->status);
+                xcb_ungrab_pointer(connection, XCB_CURRENT_TIME);
+                set_wiimote_mode(connection, 0);
+                break;
+            case XCB_GRAB_STATUS_ALREADY_GRABBED:
+            case XCB_GRAB_STATUS_FROZEN:
+                printf("%d Mouse Grabbed!\n", reply->status);
+                set_wiimote_mode(connection, 1);
+                break;
+            default:
+                printf("%d Mouse Not Grabbed (someone else owns it!)!\n", reply->status);
+                set_wiimote_mode(connection, 1);
+                break;
+        }
+        if (!reply) goto out;
+    }
 
 out:
 
+    if (connection) xcb_disconnect(connection);
+
     return 0;
 }
+
