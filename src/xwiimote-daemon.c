@@ -4,6 +4,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
@@ -15,15 +18,13 @@
 #include "ir.h"
 
 
-/*
-TODO
-make accept a program as an option
-make help text
-*/
-
+struct config {
+    Bool version;
+    Bool help;
+    char const * program;
+};
 
 static int _mode = 0;
-
 
 static void
 get_atom_names(xcb_connection_t *connection, xcb_atom_t atoms[], int len, char*** out) {
@@ -203,7 +204,7 @@ out:
 }
 
 
-int main(int argc, char* argv[]) {
+static int run_daemon(void) {
   xcb_connection_t *connection = NULL;
   struct timespec req = {
     .tv_sec = 0,
@@ -219,7 +220,6 @@ int main(int argc, char* argv[]) {
     if (!connection) goto out;
 
     sync_wiimote_mode(connection);
-
 out:
 
     if (connection) xcb_disconnect(connection);
@@ -227,5 +227,92 @@ out:
   }
 
   return 0;
+}
+
+static int try_fork_daemon(char const * program) {
+  pid_t pid = fork();
+  if (pid == 0) {
+    run_daemon();
+  } else if (pid > 0) {
+    int status = 0;
+    printf("starting program %s\n", program);
+    system(program);
+    printf("program stopped\n");
+    kill(pid, SIGKILL);
+    waitpid(pid, &status, 0);
+  } else {
+    printf("There was an error forking\n");
+  }
+  return 0;
+}
+
+static int show_help(void) {
+  printf("USAGE: xwiimote-daemon [options] ... [program]\n\n"
+
+        "  -v, --version   Print version information\n"
+        "  -h, --help      Print this help dialog\n\n"
+
+        "You can run wiimote-daemon directly with no options, or you can\n"
+        "pass the program name to make wiimote-daemon automatically quit\n"
+        "when the game is quit.\n\n"
+
+        "This program automates switching of the ir mode between menu\n"
+        "and game mode to allowing you to easily use your wiimote for standard\n"
+        "3d PC gaming.\n\n"
+
+        "Some games will require tweaking of their settings.  Portal requires\n"
+        "switching the mouse to raw input.  Minecraft requires turning off\n"
+        "fullscreen.\n\n"
+
+        "The daemon works be recognizing xorg pointer grabs.  When the grab changes,\n"
+        "the daemon will print the new state to facilitate debugging.  In the end\n"
+        "this daemon is a ducktype for games that doen't support the linux wiimote\n"
+        "driver, so most tinkering will need to be done game-by-game.");
+
+  return 0;
+}
+
+static int show_version(void) {
+  printf("TODO\n");
+  return 0;
+}
+
+static int parse_arguments(struct config *config, int argc, char* argv[]) {
+  int i = 1;
+  for (i = 1; i < argc; i++) {
+    if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
+      config->version = TRUE;
+      break;
+    } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+      config->help = TRUE;
+      break;
+    } else {
+      config->program = argv[i];
+      break;
+    }
+  }
+
+  return 0;
+}
+
+int main(int argc, char* argv[]) {
+  struct config config = {0};
+  int status = 0;
+
+  if (argc == 1) {
+    return run_daemon();
+  } else if ((status = parse_arguments(&config, argc, argv))) {
+    return status;
+  }
+  
+  if (config.help) {
+    return show_help();
+  } else if (config.version) {
+    return show_version();
+  } else if (config.program) {
+    return try_fork_daemon(config.program);
+  }
+
+  return show_help();
 }
 
