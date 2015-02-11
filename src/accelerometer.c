@@ -35,6 +35,50 @@
 
 #include "accelerometer.h"
 
+static void calculate_angle(struct accelerometer *accelerometer,
+                            struct accelerometer_config *config,
+                            struct xwii_event *ev,
+                            InputInfoPtr info)
+{
+    double x, z;
+    double angle = -1;
+    x = accelerometer->accel_history_ev[0].x;
+    z = accelerometer->accel_history_ev[0].z;
+
+    if (x > 100 || x < -100 || z > 100 || z < -100) {
+      return;
+    }
+    
+    {
+      // First quadrant
+      if (z > 0 && x >= 0) {
+          angle = x * (90.0 / 100.0);
+      }
+      //Second quadrant
+      if (z <= 0 && x > 0) {
+          angle = (fabs(z) * (90.0 / 100.0)) + 90.0;
+      }
+      //Third quadrant
+      if (z < 0 && x <= 0) {
+          angle = (fabs(x) * (90.0 / 100.0)) + 180.0;
+      }
+      //Forth quadrant
+      if (z >= 0 && x < 0) {
+          angle = (z * (90.0 / 100.0)) + 270.0;
+      }
+
+      while (angle >= 360.0) {
+        angle -= 360.0;
+      }
+
+      angle = 360 - angle;
+      if (accelerometer->angle != angle) {
+        xf86IDrvMsg(info, X_INFO, "accelerometer angle: (%f)\n", angle); 
+        accelerometer->angle = angle;
+      }
+    }
+}
+
 
 void handle_accelerometer(struct accelerometer *accelerometer,
                           struct accelerometer_config *config,
@@ -64,7 +108,7 @@ void handle_accelerometer(struct accelerometer *accelerometer,
 	r = y % ACCELEROMETER_HISTORY_MOD;
 	y -= r;
 
-	xf86PostMotionEvent(info->dev, 1, 0, 2, x, y);
+  calculate_angle(accelerometer, config, ev, info);
 }
 
 

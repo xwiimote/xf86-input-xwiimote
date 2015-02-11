@@ -17,6 +17,7 @@
 struct accelerometer {
 	struct xwii_event_abs accel_history_ev[ACCELEROMETER_HISTORY_NUM];
 	int accel_history_cur;
+  double angle;
 };
 
 

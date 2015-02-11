@@ -43,10 +43,8 @@ struct ir {
   int x;
   int y;
 
-  double menu_x;
-  double menu_y;
-  double previous_menu_x;
-  double previous_menu_y;
+  double rotated_x;
+  double rotated_y;
 
   double continuous_scroll_speed_x;
   double continuous_scroll_speed_y;
@@ -72,6 +70,7 @@ struct ir_config {
 	int continuous_scroll_border_y;
   int continuous_scroll_max_x;
   int continuous_scroll_max_y;
+  Bool remove_rotation;
 };
 
 
@@ -81,7 +80,7 @@ void preinit_ir (struct ir_config *config);
 void close_ir(struct ir *ir);
 
 
-void handle_ir(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);
+void handle_ir(struct ir *ir, struct ir_config *config, double angle, struct xwii_event *ev, InputInfoPtr info);
 void handle_continuous_scrolling(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);
 
 

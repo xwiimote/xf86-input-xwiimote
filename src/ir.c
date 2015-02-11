@@ -38,6 +38,8 @@
 
 #include "ir.h"
 
+#define TO_RADIANS(deg) (deg * M_PI / 180)
+
 
 BOOL ir_is_active(struct ir *ir,
                   struct ir_config *config,
@@ -47,6 +49,53 @@ BOOL ir_is_active(struct ir *ir,
 			|| (ev->time.tv_sec == ir->last_valid_event.tv_sec + config->keymap_expiry_secs
 				&& ev->time.tv_usec < ir->last_valid_event.tv_usec));
 }
+
+
+static void translate_coordinates_to_angle (struct ir *ir,
+                                            struct ir_config *config,
+                                            double angle,
+                                            InputInfoPtr info)
+{
+  double center = ((double) IR_MAX_Y / 2.0);
+  double x = (((double) ir->x) * ((double) IR_MAX_Y / (double) IR_MAX_X)) - center;
+  double y = (ir->y - center);
+  double rotated_x;
+  double rotated_y;
+
+  double r = sqrt(pow(x, 2) + pow(y, 2));
+  double new_angle = asin(fabs(y)/r);
+
+  angle = TO_RADIANS(angle);
+
+  //Work with everything like it's in the first quardant
+
+  if (x < 0 && y < 0) {
+    //Third quadrant
+    new_angle = M_PI + ((M_PI / 2) - new_angle);
+  }
+  else if (x < 0 && y > 0) {
+    //Forth quadrant
+    new_angle = (M_PI * 3.0 / 2.0) + new_angle;
+  }
+  else if (x > 0 && y < 0) {
+    //Second quardant
+    new_angle = new_angle + (M_PI / 2.0);
+  }
+  else if (x > 0 && y > 0) {
+    //First quarant
+    new_angle = (M_PI / 2) - new_angle;
+  }
+
+  new_angle += angle;
+
+  rotated_x = (r * (sin(new_angle)));
+  rotated_y = (r * (cos(new_angle)));
+
+  ir->x = (int) rotated_x;
+  ir->y = (int) rotated_y;
+}
+
+
 
 static void calculate_ir_coordinates(struct ir *ir,
                                      struct ir_config *config,
@@ -197,7 +246,6 @@ updateCursorPositionTimer(OsTimerPtr        timer,
 {
   struct ir *ir;
   int sigstate;
-  int x, y;
   double delta_x, delta_y, delta_h, ratio;
 
   ir = arg;
@@ -241,6 +289,7 @@ updateCursorPositionTimer(OsTimerPtr        timer,
 
   //Handle the continuous edge scrolling
   if (ir->mode == IR_MODE_GAME) {
+    int x, y;
     ir->continuous_scroll_subpixel_x += ir->continuous_scroll_speed_x;
     x = (int) ir->continuous_scroll_subpixel_x;
     ir->continuous_scroll_subpixel_x -= x; 
@@ -262,10 +311,14 @@ updateCursorPositionTimer(OsTimerPtr        timer,
 
 void handle_ir(struct ir *ir,
                struct ir_config *config,
+               double angle,
                struct xwii_event *ev,
                InputInfoPtr info)
 {
   calculate_ir_coordinates(ir, config, ev, info);
+  if (config->remove_rotation) {
+    translate_coordinates_to_angle (ir, config, angle, info);
+  }
   handle_continuous_scrolling (ir, config, ev, info); 
 
   if (!ir->timer) {
@@ -294,6 +347,7 @@ void configure_ir(struct ir_config *config,
                   InputInfoPtr info)
 {
 	const char *t;
+  int i;
   char option_key[100];
 
   snprintf(option_key, sizeof(option_key), "%sIRAvgRadius", prefix);
@@ -347,6 +401,17 @@ void configure_ir(struct ir_config *config,
 	t = xf86FindOptionValue(info->options, option_key);
 	parse_scale(t, &config->continuous_scroll_max_y);
   xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_y);
+
+  snprintf(option_key, sizeof(option_key), "%sRemoveRotation", prefix);
+  t = xf86FindOptionValue(info->options, option_key);
+  if (!t)
+    t = "";
+  if (!strcasecmp(t, "on") ||
+    !strcasecmp(t, "true") ||
+    !strcasecmp(t, "yes"))
+    config->remove_rotation = TRUE;
+  else if (sscanf(t, "%i", &i) != 1)
+    config->remove_rotation = 0;
 }
 
 

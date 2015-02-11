@@ -423,16 +423,6 @@ static void xwiimote_input(int fd, pointer data)
 				handle_wiimote_key(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_ACCEL:
-        //USE TO MAKE IT SO TILTING THE WIIMTOE DOESN'T EFFECT TRACKING
-        /*TODO 
-        xf86IDrvMsg(info, X_INFO, "accelerometer: (%d, %d, %d)\n", ev.v.abs[0].x, ev.v.abs[0].y, ev.v.abs[0].z); 
-
-        (-100, y, 0) is tilted left
-        (0, y, 100) is flat
-        (100, y, 0) is tilted right
-        (0, y, -100) is upside down
-
-        */
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
@@ -641,6 +631,7 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .remove_rotation = TRUE,
     },
     .accelerometer = {
     },
@@ -678,6 +669,7 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
       .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
       .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .remove_rotation = TRUE,
     },
     .accelerometer = {
     },

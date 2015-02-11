@@ -235,13 +235,11 @@ static int try_fork_daemon(char const * program) {
     run_daemon();
   } else if (pid > 0) {
     int status = 0;
-    printf("starting program %s\n", program);
     system(program);
-    printf("program stopped\n");
     kill(pid, SIGKILL);
     waitpid(pid, &status, 0);
   } else {
-    printf("There was an error forking\n");
+    fprintf(stderr, "There was an error forking the daemon from %s\n", program);
   }
   return 0;
 }

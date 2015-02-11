@@ -188,7 +188,8 @@ void handle_wiimote_ir(struct wiimote *wiimote,
                        InputInfoPtr info)
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
-  handle_ir(&wiimote->ir, &config->ir, ev, info);
+  //handle_ir(&wiimote->ir, &config->ir, wiimote->accelerometer.angle, ev, info);
+  handle_ir(&wiimote->ir, &config->ir, 90, ev, info);
 }
 
 void handle_wiimote_motionplus(struct wiimote *wiimote,
@@ -207,7 +208,8 @@ void handle_wiimote_accelerometer(struct wiimote *wiimote,
                                   unsigned int state,
                                   InputInfoPtr info)
 {
-	if (config->motion_source != WIIMOTE_MOTION_SOURCE_ACCELEROMETER) return;
+  //TODO
+	//if (config->motion_source != WIIMOTE_MOTION_SOURCE_ACCELEROMETER) return;
   handle_accelerometer(&wiimote->accelerometer, &config->accelerometer, ev, info);
 }
 
