@@ -81,10 +81,10 @@ static void depress_key(struct key *key,
   key->state = KEY_STATE_RELEASED;
 }
 
-void handle_key(struct key *key,
-               struct key_config *config,
-               unsigned int state,
-               InputInfoPtr info) {
+void handle_key_event(struct key *key,
+                      struct key_config *config,
+                      unsigned int state,
+                      InputInfoPtr info) {
   if (state && !key->state) {
     press_key(key, config, state, info);
   } else if (!state && key->state) {

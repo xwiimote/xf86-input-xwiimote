@@ -126,12 +126,12 @@ void configure_analog_stick_axis(struct analog_stick_axis_config *config,
 }
 
 
-void handle_analog_stick_axis(struct analog_stick_axis *axis,
-                              struct analog_stick_axis_config *config,
-                              int32_t value,
-                              int state,
-                              InputInfoPtr info,
-                              int first_valuator)
+void handle_analog_stick_axis_event(struct analog_stick_axis *axis,
+                                    struct analog_stick_axis_config *config,
+                                    int32_t value,
+                                    int state,
+                                    InputInfoPtr info,
+                                    int first_valuator)
 {
 	int32_t pixel;
 
@@ -170,18 +170,18 @@ void handle_analog_stick_axis(struct analog_stick_axis *axis,
 	/* Handle key mappings */
 	if (value > config->deadzone && axis->previous_value <= config->deadzone) {
     // Axis moved to high
-		handle_key(&axis->high, &config->high, state, info);
-		handle_key(&axis->low, &config->low, 0, info);
+		handle_key_event(&axis->high, &config->high, state, info);
+		handle_key_event(&axis->low, &config->low, 0, info);
 	}
 	else if (value < -config->deadzone && axis->previous_value >= -config->deadzone) {
 	  // Axis moved to low 
-		handle_key(&axis->low, &config->low, 0, info);
-		handle_key(&axis->low, &config->low, state, info);
+		handle_key_event(&axis->low, &config->low, 0, info);
+		handle_key_event(&axis->low, &config->low, state, info);
 	}
 	else if (value >= -config->deadzone && value <= config->deadzone) {
 	  // Axis moved to rest
-		handle_key(&axis->low, &config->low, 0, info);
-		handle_key(&axis->high, &config->high, 0, info);
+		handle_key_event(&axis->low, &config->low, 0, info);
+		handle_key_event(&axis->high, &config->high, 0, info);
 	}
 
   /* Handle pointer motion */

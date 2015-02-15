@@ -21,6 +21,7 @@
 #define IR_TO_SCREEN_RATIO 3
 
 #define IR_KEYMAP_EXPIRY_SECS 1
+#define IR_REMOVE_ROTATION 1
 
 #define IR_DISTSQ(ax, ay, bx, by) ((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
 
@@ -55,9 +56,6 @@ struct ir {
   double smooth_scroll_y;
   double previous_smooth_scroll_x;
   double previous_smooth_scroll_y;
-
-  OsTimerPtr timer;
-  InputInfoPtr info;
 };
 
 struct ir_config {
@@ -70,7 +68,7 @@ struct ir_config {
 	int continuous_scroll_border_y;
   int continuous_scroll_max_x;
   int continuous_scroll_max_y;
-  Bool remove_rotation;
+  BOOL remove_rotation;
 };
 
 
@@ -80,8 +78,8 @@ void preinit_ir (struct ir_config *config);
 void close_ir(struct ir *ir);
 
 
-void handle_ir(struct ir *ir, struct ir_config *config, double angle, struct xwii_event *ev, InputInfoPtr info);
-void handle_continuous_scrolling(struct ir *ir, struct ir_config *config, struct xwii_event *ev, InputInfoPtr info);
+void handle_ir_event(struct ir *ir, struct ir_config *config, double angle, struct xwii_event *ev, InputInfoPtr info);
+void handle_ir_timer(struct ir *ir, struct ir_config *config, InputInfoPtr info);
 
 
 #endif

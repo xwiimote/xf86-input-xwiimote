@@ -33,6 +33,7 @@
 #include <math.h>
 #include <xf86.h>
 
+#include "util.h"
 #include "accelerometer.h"
 
 static void calculate_angle(struct accelerometer *accelerometer,
@@ -73,17 +74,17 @@ static void calculate_angle(struct accelerometer *accelerometer,
 
       angle = 360 - angle;
       if (accelerometer->angle != angle) {
-        xf86IDrvMsg(info, X_INFO, "accelerometer angle: (%f)\n", angle); 
+        xf86IDrvMsg(info, X_INFO, "accelerometer angle: (%d)\n", (int) angle); 
         accelerometer->angle = angle;
       }
     }
 }
 
 
-void handle_accelerometer(struct accelerometer *accelerometer,
-                          struct accelerometer_config *config,
-                          struct xwii_event *ev,
-                          InputInfoPtr info)
+void handle_accelerometer_event(struct accelerometer *accelerometer,
+                                struct accelerometer_config *config,
+                                struct xwii_event *ev,
+                                InputInfoPtr info)
 {
 	int32_t x, y, r;
 	int i;
@@ -112,8 +113,39 @@ void handle_accelerometer(struct accelerometer *accelerometer,
 }
 
 
+void handle_accelerometer_timer(struct accelerometer *accelerometer, struct accelerometer_config *config, InputInfoPtr info) {
+  double angle =  accelerometer->angle;
+  double previous_angle = accelerometer->smooth_rotate_angle;
+  double counter_clockwise_distance = fabs(previous_angle - (angle - 360.0));
+  double clockwise_distance = fabs(previous_angle - angle);
+
+  if (clockwise_distance < counter_clockwise_distance) {
+    if (clockwise_distance <= config->max_angle_delta) {
+      previous_angle = angle;
+    } else {
+      previous_angle += config->max_angle_delta;
+    }
+  } else {
+    if (counter_clockwise_distance <= config->max_angle_delta) {
+       previous_angle = angle;
+    } else {
+      previous_angle -= config->max_angle_delta;
+    }
+  }
+  accelerometer->smooth_rotate_angle = previous_angle;
+}
+
+
 void configure_accelerometer(struct accelerometer_config *config, 
-                             char const *name,
+                             char const *prefix,
                              InputInfoPtr info)
 {
+	const char *t;
+  char option_key[100];
+
+  snprintf(option_key, sizeof(option_key), "%sAccelerometerMaxAngleDelta", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
+  if (parse_double_with_default(t, &config->max_angle_delta, ACCELEROMETER_MAX_ANGLE_DELTA)) {
+    xf86IDrvMsg(info, X_INFO, "%s %f\n", option_key, config->max_angle_delta);
+  }
 }

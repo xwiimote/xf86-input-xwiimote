@@ -39,6 +39,7 @@
 #include <xf86.h>
 #include <xf86Module.h>
 #include <xf86Xinput.h>
+#include <xf86_OSproc.h>
 #include <xkbsrv.h>
 #include <xkbstr.h>
 #include <xorgVersion.h>
@@ -284,6 +285,10 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+  if (dev->timer != NULL) {
+    TimerCancel(dev->timer);
+    dev->timer = NULL;
+  }
   close_wiimote(&dev->wiimote);
 	return Success;
 }
@@ -378,7 +383,25 @@ static unsigned int calculate_next_analog_stick_layout(struct analog_stick *anal
   return layout;
 }
 
-static void xwiimote_input(int fd, pointer data)
+static CARD32
+handle_xwiimote_timer(OsTimerPtr        timer,
+                       CARD32            atime,
+                       pointer           arg)
+{
+  struct xwiimote_dev *dev = arg;
+  unsigned int state;
+
+  int sigstate= xf86BlockSIGIO();
+
+  state = dev->motion_layout = KEY_LAYOUT_IR;
+  handle_wiimote_timer(&dev->wiimote, &dev->wiimote_config[state], dev->info);
+
+  xf86UnblockSIGIO (sigstate);
+
+  return 1;
+}
+
+static void handle_xwiimote_event(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
 	InputInfoPtr info = dev->info;
@@ -420,13 +443,13 @@ static void xwiimote_input(int fd, pointer data)
         layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
         state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_key(wiimote, wiimote_config, &ev, state, info);
+				handle_wiimote_key_event(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_ACCEL:
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_accelerometer(wiimote, wiimote_config, &ev, state, info);
+				handle_wiimote_accelerometer_event(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_IR:
         switch(dev->motion_layout) {
@@ -439,28 +462,37 @@ static void xwiimote_input(int fd, pointer data)
             break;
         }
         wiimote_config = &dev->wiimote_config[dev->motion_layout];
-				handle_wiimote_ir(wiimote, wiimote_config, &ev, state, info);
+				handle_wiimote_ir_event(wiimote, wiimote_config, &ev, state, info);
 			case XWII_EVENT_MOTION_PLUS:
         layout = dev->motion_layout;
         state = dev->motion_layout;
         wiimote_config = &dev->wiimote_config[layout];
-				handle_wiimote_motionplus(wiimote, wiimote_config, &ev, state, info);
+				handle_wiimote_motionplus_event(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_NUNCHUK_KEY:
         keycode = xwii_key_to_nunchuk_key(ev.v.key.code, info);
         layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
         state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
-				handle_nunchuk_key(nunchuk, nunchuk_config, &ev, state, info);
+				handle_nunchuk_key_event(nunchuk, nunchuk_config, &ev, state, info);
 				break;
 			case XWII_EVENT_NUNCHUK_MOVE:
         layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, dev->motion_layout);
         state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
         nunchuk_config = &dev->nunchuk_config[layout];
-				handle_nunchuk_analog_stick(nunchuk, nunchuk_config, &ev, state, info);
+				handle_nunchuk_analog_stick_event(nunchuk, nunchuk_config, &ev, state, info);
 				break;
 		}
 	} while (!ret);
+
+  if (!dev->timer) {
+    dev->timer = TimerSet(
+          dev->timer,
+          0,         
+          1,         
+          handle_xwiimote_timer,
+          dev);
+  }
 
 	if (ret != -EAGAIN) {
 		xf86IDrvMsg(info, X_INFO, "Device disconnected\n");
@@ -486,7 +518,7 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
-		dev->handler = xf86AddInputHandler(info->fd, xwiimote_input, dev);
+		dev->handler = xf86AddInputHandler(info->fd, handle_xwiimote_event, dev);
 	} else {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get interface fd\n");
 	}
@@ -634,6 +666,7 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .remove_rotation = TRUE,
     },
     .accelerometer = {
+      .max_angle_delta = ACCELEROMETER_MAX_ANGLE_DELTA,
     },
     .motionplus = {
       .x = 0,
@@ -672,6 +705,7 @@ static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
       .remove_rotation = TRUE,
     },
     .accelerometer = {
+      .max_angle_delta = ACCELEROMETER_MAX_ANGLE_DELTA,
     },
     .motionplus = {
       .x = 0,

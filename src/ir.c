@@ -34,11 +34,12 @@
 
 #include <xorg-server.h>
 #include <xf86.h>
-#include <xf86_OSproc.h>
 
+#include "util.h"
 #include "ir.h"
 
-#define TO_RADIANS(deg) (deg * M_PI / 180)
+#define TO_RADIANS(deg) (deg * M_PI / 180.0)
+#define TO_DEGREES(deg) (deg * 180.0 / M_PI)
 
 
 BOOL ir_is_active(struct ir *ir,
@@ -69,19 +70,19 @@ static void translate_coordinates_to_angle (struct ir *ir,
 
   //Work with everything like it's in the first quardant
 
-  if (x < 0 && y < 0) {
+  if (x <= 0 && y <= 0) {
     //Third quadrant
     new_angle = M_PI + ((M_PI / 2) - new_angle);
   }
-  else if (x < 0 && y > 0) {
+  else if (x <= 0 && y >= 0) {
     //Forth quadrant
     new_angle = (M_PI * 3.0 / 2.0) + new_angle;
   }
-  else if (x > 0 && y < 0) {
+  else if (x >= 0 && y <= 0) {
     //Second quardant
     new_angle = new_angle + (M_PI / 2.0);
   }
-  else if (x > 0 && y > 0) {
+  else if (x >= 0 && y >= 0) {
     //First quarant
     new_angle = (M_PI / 2) - new_angle;
   }
@@ -90,6 +91,13 @@ static void translate_coordinates_to_angle (struct ir *ir,
 
   rotated_x = (r * (sin(new_angle)));
   rotated_y = (r * (cos(new_angle)));
+
+  rotated_x += center;
+  rotated_y += center;
+
+  rotated_x *= ((double) IR_MAX_X / (double) IR_MAX_Y);
+
+  xf86IDrvMsg(info, X_INFO, "(%d, %d), (%d, %d) accelerometer angle: (%d)\n", ir->x, ir->y, (int) rotated_x, (int) rotated_y, (int) TO_DEGREES(angle)); 
 
   ir->x = (int) rotated_x;
   ir->y = (int) rotated_y;
@@ -205,10 +213,10 @@ static void calculate_ir_coordinates(struct ir *ir,
 }
 
 
-void handle_continuous_scrolling(struct ir *ir,
-                                 struct ir_config *config,
-                                 struct xwii_event *ev,
-                                 InputInfoPtr info)
+static void calculate_continuous_scrolling_delta(struct ir *ir,
+                                                 struct ir_config *config,
+                                                 struct xwii_event *ev,
+                                                 InputInfoPtr info)
 {
   double x_scale, y_scale;
   double x, y;
@@ -239,18 +247,12 @@ void handle_continuous_scrolling(struct ir *ir,
 }
 
 
-static CARD32
-updateCursorPositionTimer(OsTimerPtr        timer,
-                          CARD32            atime,
-                          pointer           arg)
+void
+handle_ir_timer(struct ir *ir,
+                struct ir_config *config,
+                InputInfoPtr info)
 {
-  struct ir *ir;
-  int sigstate;
   double delta_x, delta_y, delta_h, ratio;
-
-  ir = arg;
-
-  sigstate = xf86BlockSIGIO();
 
   //Handle the pointer position
 
@@ -280,9 +282,9 @@ updateCursorPositionTimer(OsTimerPtr        timer,
       ir->smooth_scroll_y = ir->previous_smooth_scroll_y + delta_y;
 
       if (ir->mode == IR_MODE_GAME) {
-        xf86PostMotionEvent(ir->info->dev, Relative, 0, 2, (int) delta_x, (int) delta_y);
+        xf86PostMotionEvent(info->dev, Relative, 0, 2, (int) delta_x, (int) delta_y);
       } else {
-        xf86PostMotionEvent(ir->info->dev, Absolute, 0, 2, (int) ir->smooth_scroll_x * IR_TO_SCREEN_RATIO, (int) ir->smooth_scroll_y * IR_TO_SCREEN_RATIO);
+        xf86PostMotionEvent(info->dev, Absolute, 0, 2, (int) ir->smooth_scroll_x * IR_TO_SCREEN_RATIO, (int) ir->smooth_scroll_y * IR_TO_SCREEN_RATIO);
       }
     }  
   }
@@ -299,46 +301,23 @@ updateCursorPositionTimer(OsTimerPtr        timer,
     ir->continuous_scroll_subpixel_y -= y; 
 
     if (x || y) {
-      xf86PostMotionEvent(ir->info->dev, Relative, 0, 2, (int) (x), (int) (y));
+      xf86PostMotionEvent(info->dev, Relative, 0, 2, (int) (x), (int) (y));
     }
   }
-
-  xf86UnblockSIGIO (sigstate);
-
-  return 1;
 }
 
 
-void handle_ir(struct ir *ir,
-               struct ir_config *config,
-               double angle,
-               struct xwii_event *ev,
-               InputInfoPtr info)
+void handle_ir_event(struct ir *ir,
+                     struct ir_config *config,
+                     double angle,
+                     struct xwii_event *ev,
+                     InputInfoPtr info)
 {
   calculate_ir_coordinates(ir, config, ev, info);
   if (config->remove_rotation) {
     translate_coordinates_to_angle (ir, config, angle, info);
   }
-  handle_continuous_scrolling (ir, config, ev, info); 
-
-  if (!ir->timer) {
-    ir->info = info;
-    ir->timer = TimerSet(
-          ir->timer,
-          0,         
-          1,         
-          updateCursorPositionTimer,
-          ir);
-  }
-}
-
-
-static void parse_scale(const char *t, int *out)
-{
-	if (!t)
-		return;
-
-	*out = atoi(t);
+  calculate_continuous_scrolling_delta(ir, config, ev, info); 
 }
 
 
@@ -347,77 +326,76 @@ void configure_ir(struct ir_config *config,
                   InputInfoPtr info)
 {
 	const char *t;
-  int i;
   char option_key[100];
 
   snprintf(option_key, sizeof(option_key), "%sIRAvgRadius", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->avg_radius);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_radius);
+	if (parse_int_with_default(t, &config->avg_radius, IR_AVG_RADIUS)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_radius);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRAvgMaxSamples", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->avg_max_samples);
-	if (config->avg_max_samples < 1) config->avg_max_samples = 1;
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_max_samples);
+  if (parse_int_with_default(t, &config->avg_max_samples, IR_AVG_MAX_SAMPLES)) {
+    if (config->avg_max_samples < 1) config->avg_max_samples = 1;
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_max_samples);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRAvgMinSamples", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->avg_min_samples);
-	if (config->avg_min_samples < 1) {
-		config->avg_min_samples = 1;
-	} else if (config->avg_min_samples > config->avg_max_samples) {
-		config->avg_min_samples = config->avg_max_samples;
-	}
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_min_samples);
+	if (parse_int_with_default(t, &config->avg_min_samples, IR_AVG_MIN_SAMPLES)) {
+    if (config->avg_min_samples < 1) {
+      config->avg_min_samples = 1;
+    } else if (config->avg_min_samples > config->avg_max_samples) {
+      config->avg_min_samples = config->avg_max_samples;
+    }
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_min_samples);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRAvgWeight", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->avg_weight);
-	if (config->avg_weight < 0) config->avg_weight = 0;
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_weight);
+	if (parse_int_with_default(t, &config->avg_weight, IR_AVG_WEIGHT)) {
+    if (config->avg_weight < 0) config->avg_weight = 0;
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->avg_weight);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRKeymapExpirySecs", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->keymap_expiry_secs);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->keymap_expiry_secs);
+	if (parse_int_with_default(t, &config->keymap_expiry_secs, IR_KEYMAP_EXPIRY_SECS)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->keymap_expiry_secs);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorderX", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->continuous_scroll_border_x);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_x);
+	if (parse_int_with_default(t, &config->continuous_scroll_border_x, IR_CONTINUOUS_SCROLL_BORDER_X)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_x);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollBorderY", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->continuous_scroll_border_y);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_y);
+	if (parse_int_with_default(t, &config->continuous_scroll_border_y, IR_CONTINUOUS_SCROLL_BORDER_Y)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_border_y);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollMaxX", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->continuous_scroll_max_x);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_x);
+	if (parse_int_with_default(t, &config->continuous_scroll_max_x, IR_CONTINUOUS_SCROLL_MAX_X)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_x);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sIRContinuousScrollMaxY", prefix);
 	t = xf86FindOptionValue(info->options, option_key);
-	parse_scale(t, &config->continuous_scroll_max_y);
-  xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_y);
+	if (parse_int_with_default(t, &config->continuous_scroll_max_y, IR_CONTINUOUS_SCROLL_MAX_Y)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->continuous_scroll_max_y);
+  }
 
   snprintf(option_key, sizeof(option_key), "%sRemoveRotation", prefix);
   t = xf86FindOptionValue(info->options, option_key);
-  if (!t)
-    t = "";
-  if (!strcasecmp(t, "on") ||
-    !strcasecmp(t, "true") ||
-    !strcasecmp(t, "yes"))
-    config->remove_rotation = TRUE;
-  else if (sscanf(t, "%i", &i) != 1)
-    config->remove_rotation = 0;
+  if (parse_bool_with_default(t, &config->remove_rotation, IR_REMOVE_ROTATION)) {
+    xf86IDrvMsg(info, X_INFO, "%s %d\n", option_key, config->remove_rotation);
+  }
 }
 
 
 void close_ir(struct ir *ir) {
-  if (ir->timer != NULL) {
-    TimerCancel(ir->timer);
-    ir->timer = NULL;
-  }
 }

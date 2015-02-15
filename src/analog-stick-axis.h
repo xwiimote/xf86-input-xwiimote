@@ -32,6 +32,6 @@ struct analog_stick_axis_config {
 };
 
 void configure_analog_stick_axis(struct analog_stick_axis_config *config, char const *option_key, InputInfoPtr info);
-void handle_analog_stick_axis(struct analog_stick_axis *axis, struct analog_stick_axis_config *config, int32_t value, int state, InputInfoPtr info, int first_valuator);
+void handle_analog_stick_axis_event(struct analog_stick_axis *axis, struct analog_stick_axis_config *config, int32_t value, int state, InputInfoPtr info, int first_valuator);
 
 #endif

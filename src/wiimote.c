@@ -145,11 +145,11 @@ void configure_wiimote(struct wiimote_config *config,
   configure_wiimote_keys(config, prefix, info);
 }
 
-void handle_wiimote_key(struct wiimote *wiimote,
-                        struct wiimote_config *config,
-                        struct xwii_event *ev,
-                        unsigned int state,
-                        InputInfoPtr info)
+void handle_wiimote_key_event(struct wiimote *wiimote,
+                              struct wiimote_config *config,
+                              struct xwii_event *ev,
+                              unsigned int state,
+                              InputInfoPtr info)
 {
   unsigned int keycode;
   unsigned int previous_state;
@@ -157,7 +157,7 @@ void handle_wiimote_key(struct wiimote *wiimote,
   keycode = xwii_key_to_wiimote_key(ev->v.key.code, info);
   previous_state = wiimote->keys[keycode].state;
 
-  handle_key(&wiimote->keys[keycode], &config->keys[keycode], state, info);
+  handle_key_event(&wiimote->keys[keycode], &config->keys[keycode], state, info);
 
   if (state && !previous_state) {
     switch (config->keys[keycode].ir_mode) {
@@ -181,36 +181,45 @@ void handle_wiimote_key(struct wiimote *wiimote,
   }
 }
 
-void handle_wiimote_ir(struct wiimote *wiimote,
-                       struct wiimote_config *config,
-                       struct xwii_event *ev,
-                       unsigned int state,
-                       InputInfoPtr info)
+void handle_wiimote_ir_event(struct wiimote *wiimote,
+                             struct wiimote_config *config,
+                             struct xwii_event *ev,
+                             unsigned int state,
+                             InputInfoPtr info)
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
-  //handle_ir(&wiimote->ir, &config->ir, wiimote->accelerometer.angle, ev, info);
-  handle_ir(&wiimote->ir, &config->ir, 90, ev, info);
+  //handle_ir(&wiimote->ir, &config->ir, 0, ev, info);
+  handle_ir_event(&wiimote->ir, &config->ir, wiimote->accelerometer.angle, ev, info);
 }
 
-void handle_wiimote_motionplus(struct wiimote *wiimote,
-                               struct wiimote_config *config,
-                               struct xwii_event *ev,
-                               unsigned int state,
-                               InputInfoPtr info)
+void handle_wiimote_motionplus_event(struct wiimote *wiimote,
+                                     struct wiimote_config *config,
+                                     struct xwii_event *ev,
+                                     unsigned int state,
+                                     InputInfoPtr info)
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_MOTIONPLUS) return;
-  handle_motionplus(&wiimote->motionplus, &config->motionplus, ev, info);
+  handle_motionplus_event(&wiimote->motionplus, &config->motionplus, ev, info);
 }
 
-void handle_wiimote_accelerometer(struct wiimote *wiimote,
-                                  struct wiimote_config *config,
-                                  struct xwii_event *ev,
-                                  unsigned int state,
-                                  InputInfoPtr info)
+void handle_wiimote_accelerometer_event(struct wiimote *wiimote,
+                                        struct wiimote_config *config,
+                                        struct xwii_event *ev,
+                                        unsigned int state,
+                                        InputInfoPtr info)
 {
   //TODO
 	//if (config->motion_source != WIIMOTE_MOTION_SOURCE_ACCELEROMETER) return;
-  handle_accelerometer(&wiimote->accelerometer, &config->accelerometer, ev, info);
+  handle_accelerometer_event(&wiimote->accelerometer, &config->accelerometer, ev, info);
+}
+
+
+void handle_wiimote_timer(struct wiimote *wiimote,
+                          struct wiimote_config *config,
+                          InputInfoPtr info)
+{
+    handle_accelerometer_timer(&wiimote->accelerometer, &config->accelerometer, info);
+    handle_ir_timer(&wiimote->ir, &config->ir, info);
 }
 
 

@@ -36,13 +36,13 @@
 #include "nunchuk.h"
 
 
-void handle_nunchuk_analog_stick(struct nunchuk *nunchuk,
-                                 struct nunchuk_config *config,
-                                 struct xwii_event *ev,
-                                 unsigned int state,
-                                 InputInfoPtr info)
+void handle_nunchuk_analog_stick_event(struct nunchuk *nunchuk,
+                                       struct nunchuk_config *config,
+                                       struct xwii_event *ev,
+                                       unsigned int state,
+                                       InputInfoPtr info)
 {
-  handle_analog_stick(&nunchuk->analog_stick, &config->analog_stick, ev, NUNCHUK_ANALOG_STICK_INDEX, state, info);
+  handle_analog_stick_event(&nunchuk->analog_stick, &config->analog_stick, ev, NUNCHUK_ANALOG_STICK_INDEX, state, info);
 }
 
 
@@ -61,17 +61,17 @@ unsigned int xwii_key_to_nunchuk_key(unsigned int keycode,
 }
 
 
-void handle_nunchuk_key(struct nunchuk *nunchuk,
-                        struct nunchuk_config *config,
-                        struct xwii_event *ev,
-                        unsigned int state,
-                        InputInfoPtr info)
+void handle_nunchuk_key_event(struct nunchuk *nunchuk,
+                              struct nunchuk_config *config,
+                              struct xwii_event *ev,
+                              unsigned int state,
+                              InputInfoPtr info)
 {  
   unsigned int keycode;
 
   keycode = xwii_key_to_nunchuk_key(ev->v.key.code, info);
 
-  handle_key(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
+  handle_key_event(&nunchuk->keys[keycode], &config->keys[keycode], state, info);
 }
 
 void configure_nunchuk(struct nunchuk_config *config,

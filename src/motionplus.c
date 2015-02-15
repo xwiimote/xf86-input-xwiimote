@@ -79,10 +79,10 @@ static void parse_axis(const char *t,	unsigned int *out)
 		*out = 2;
 }
 
-void handle_motionplus(struct motionplus *motionplus,
-                       struct motionplus_config *config,
-                       struct xwii_event *ev,
-                       InputInfoPtr info)
+void handle_motionplus_event(struct motionplus *motionplus,
+                             struct motionplus_config *config,
+                             struct xwii_event *ev,
+                             InputInfoPtr info)
 {
 	int32_t x, z;
 

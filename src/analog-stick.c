@@ -105,12 +105,12 @@ void configure_analog_stick(struct analog_stick_config *config,
 	}
 }
 
-void handle_analog_stick(struct analog_stick *stick,
-                         struct analog_stick_config *config,
-                         struct xwii_event *ev,
-                         int stick_index,
-                         unsigned int state,
-                         InputInfoPtr info)
+void handle_analog_stick_event(struct analog_stick *stick,
+                               struct analog_stick_config *config,
+                               struct xwii_event *ev,
+                               int stick_index,
+                               unsigned int state,
+                               InputInfoPtr info)
 {
   int x;
   int y;
@@ -136,8 +136,8 @@ void handle_analog_stick(struct analog_stick *stick,
       break;
   }
 
-	handle_analog_stick_axis(&stick->x, &config->x, mapped_x, state, info, 0);		
-	handle_analog_stick_axis(&stick->y, &config->y, mapped_y, state, info, 1);	   
+	handle_analog_stick_axis_event(&stick->x, &config->x, mapped_x, state, info, 0);		
+	handle_analog_stick_axis_event(&stick->y, &config->y, mapped_y, state, info, 1);	   
 
   /* Give easy access to the state */
   if (stick->x.state) {

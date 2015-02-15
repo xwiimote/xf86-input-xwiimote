@@ -27,6 +27,8 @@ struct xwiimote_dev {
   struct wiimote_config wiimote_config[KEY_LAYOUT_NUM];
   struct nunchuk nunchuk;
   struct nunchuk_config nunchuk_config[KEY_LAYOUT_NUM];
+
+  OsTimerPtr timer;
 };
 
 #endif

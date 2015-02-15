@@ -21,3 +21,4 @@ stamp-*
 .deps
 .dirstamp
 .libs
+xwiimote-daemon

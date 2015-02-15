@@ -44,7 +44,7 @@ struct key {
   unsigned int state;
 };
 
-void handle_key(struct key *key, struct key_config *config, unsigned int state, InputInfoPtr info);
+void handle_key_event(struct key *key, struct key_config *config, unsigned int state, InputInfoPtr info);
 
 void configure_key_by_value(struct key_config *config, char const *name, char const *value, InputInfoPtr info);
 void configure_key(struct key_config *config, char const *option_key, InputInfoPtr info);

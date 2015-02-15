@@ -53,10 +53,12 @@ void configure_wiimote(struct wiimote_config *config, char const * prefix, struc
 
 BOOL wiimote_ir_is_active(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev);
 
-void handle_wiimote_key(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
-void handle_wiimote_ir(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
-void handle_wiimote_motionplus(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
-void handle_wiimote_accelerometer(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
+void handle_wiimote_timer(struct wiimote *wiimote, struct wiimote_config *config, InputInfoPtr info);
+
+void handle_wiimote_key_event(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
+void handle_wiimote_ir_event(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
+void handle_wiimote_motionplus_event(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
+void handle_wiimote_accelerometer_event(struct wiimote *wiimote, struct wiimote_config *config, struct xwii_event *ev, unsigned int state, InputInfoPtr info);
 
 unsigned int xwii_key_to_wiimote_key(unsigned int keycode, InputInfoPtr info);
 
