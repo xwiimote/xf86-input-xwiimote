@@ -2,6 +2,7 @@
  * XWiimote
  *
  * Copyright (c) 2011-2013 David Herrmann <dh.herrmann@gmail.com>
+ * Copyright (c) 2015 Zachary Dovel<zakkudo2@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -112,19 +113,24 @@ void handle_accelerometer_event(struct accelerometer *accelerometer,
 }
 
 
-void handle_accelerometer_timer(struct accelerometer *accelerometer,
-                                struct accelerometer_config *config,
-                                InputInfoPtr info) {
+static void smooth_rotate(struct accelerometer *accelerometer,
+                          struct accelerometer_config *config,
+                          InputInfoPtr info) {
   double angle =  accelerometer->angle;
   double previous_angle = accelerometer->smooth_rotate_angle;
   double counter_clockwise_distance = 0.0;
   double clockwise_distance = 0.0;
   double distance = previous_angle - angle;
 
+  if (distance > config->angle_deadzone) {
+    accelerometer->is_in_deadzone  = FALSE;
+  } else if (accelerometer->is_in_deadzone) {
+    return;
+  }
+
   if (distance > 0.0) {
     counter_clockwise_distance = fabs(distance);
     clockwise_distance = 360.0 - counter_clockwise_distance;
-
   } else if (distance < 0.0) {
     clockwise_distance = fabs(distance);
     counter_clockwise_distance = 360.0 - clockwise_distance;
@@ -132,7 +138,7 @@ void handle_accelerometer_timer(struct accelerometer *accelerometer,
     clockwise_distance = distance;
     counter_clockwise_distance = distance;
   }
-  
+
   if (clockwise_distance < counter_clockwise_distance) {
     if (clockwise_distance <= config->max_angle_delta) {
       previous_angle = angle;
@@ -152,8 +158,20 @@ void handle_accelerometer_timer(struct accelerometer *accelerometer,
   } else if (previous_angle > 360.0) {
     previous_angle -= 360.0;
   }
+
+  if (previous_angle == angle) {
+    accelerometer->is_in_deadzone = TRUE;
+  }
   
   accelerometer->smooth_rotate_angle = previous_angle;
+}
+
+
+void handle_accelerometer_timer(struct accelerometer *accelerometer,
+                                struct accelerometer_config *config,
+                                InputInfoPtr info)
+{
+    smooth_rotate(accelerometer, config, info);
 }
 
 
@@ -168,5 +186,11 @@ void configure_accelerometer(struct accelerometer_config *config,
 	t = xf86FindOptionValue(info->options, option_key);
   if (parse_double_with_default(t, &config->max_angle_delta, ACCELEROMETER_MAX_ANGLE_DELTA)) {
     xf86IDrvMsg(info, X_INFO, "%s %f\n", option_key, config->max_angle_delta);
+  }
+
+  snprintf(option_key, sizeof(option_key), "%sAccelerometerAngleDeadzone", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
+  if (parse_double_with_default(t, &config->angle_deadzone, ACCELEROMETER_ANGLE_DEADZONE)) {
+    xf86IDrvMsg(info, X_INFO, "%s %f\n", option_key, config->angle_deadzone);
   }
 }

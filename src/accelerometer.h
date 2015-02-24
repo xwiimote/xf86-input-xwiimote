@@ -15,17 +15,20 @@
 #define ACCELEROMETER_HISTORY_MOD 2
 
 #define ACCELEROMETER_MAX_ANGLE_DELTA 0.1
+#define ACCELEROMETER_ANGLE_DEADZONE 2.5
 
 struct accelerometer {
 	struct xwii_event_abs accel_history_ev[ACCELEROMETER_HISTORY_NUM];
 	int accel_history_cur;
   double angle;
   double smooth_rotate_angle;
+  BOOL is_in_deadzone;
 };
 
 
 struct accelerometer_config {
   double max_angle_delta;
+  double angle_deadzone;
 };
 
 
