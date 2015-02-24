@@ -489,7 +489,7 @@ static void handle_xwiimote_event(int fd, pointer data)
     dev->timer = TimerSet(
           dev->timer,
           0,         
-          1,         
+          1000,
           handle_xwiimote_timer,
           dev);
   }

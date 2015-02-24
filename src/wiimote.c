@@ -188,8 +188,8 @@ void handle_wiimote_ir_event(struct wiimote *wiimote,
                              InputInfoPtr info)
 {
 	if (config->motion_source != WIIMOTE_MOTION_SOURCE_IR) return;
-  //handle_ir(&wiimote->ir, &config->ir, 0, ev, info);
-  handle_ir_event(&wiimote->ir, &config->ir, wiimote->accelerometer.angle, ev, info);
+  //handle_ir_event(&wiimote->ir, &config->ir, 90, ev, info);
+  handle_ir_event(&wiimote->ir, &config->ir, wiimote->accelerometer.smooth_rotate_angle, ev, info);
 }
 
 void handle_wiimote_motionplus_event(struct wiimote *wiimote,

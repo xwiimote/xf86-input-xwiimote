@@ -74,7 +74,6 @@ static void calculate_angle(struct accelerometer *accelerometer,
 
       angle = 360 - angle;
       if (accelerometer->angle != angle) {
-        xf86IDrvMsg(info, X_INFO, "accelerometer angle: (%d)\n", (int) angle); 
         accelerometer->angle = angle;
       }
     }
@@ -113,12 +112,27 @@ void handle_accelerometer_event(struct accelerometer *accelerometer,
 }
 
 
-void handle_accelerometer_timer(struct accelerometer *accelerometer, struct accelerometer_config *config, InputInfoPtr info) {
+void handle_accelerometer_timer(struct accelerometer *accelerometer,
+                                struct accelerometer_config *config,
+                                InputInfoPtr info) {
   double angle =  accelerometer->angle;
   double previous_angle = accelerometer->smooth_rotate_angle;
-  double counter_clockwise_distance = fabs(previous_angle - (angle - 360.0));
-  double clockwise_distance = fabs(previous_angle - angle);
+  double counter_clockwise_distance = 0.0;
+  double clockwise_distance = 0.0;
+  double distance = previous_angle - angle;
 
+  if (distance > 0.0) {
+    counter_clockwise_distance = fabs(distance);
+    clockwise_distance = 360.0 - counter_clockwise_distance;
+
+  } else if (distance < 0.0) {
+    clockwise_distance = fabs(distance);
+    counter_clockwise_distance = 360.0 - clockwise_distance;
+  } else {
+    clockwise_distance = distance;
+    counter_clockwise_distance = distance;
+  }
+  
   if (clockwise_distance < counter_clockwise_distance) {
     if (clockwise_distance <= config->max_angle_delta) {
       previous_angle = angle;
@@ -132,6 +146,13 @@ void handle_accelerometer_timer(struct accelerometer *accelerometer, struct acce
       previous_angle -= config->max_angle_delta;
     }
   }
+
+  if (previous_angle < 0.0) {
+    previous_angle += 360.0;
+  } else if (previous_angle > 360.0) {
+    previous_angle -= 360.0;
+  }
+  
   accelerometer->smooth_rotate_angle = previous_angle;
 }
 
