@@ -74,22 +74,22 @@ static void translate_coordinates_to_angle (struct ir *ir,
   if (x <= 0 && y <= 0) {
     //Third quadrant
     new_angle = M_PI + ((M_PI / 2) - new_angle);
-    xf86IDrvMsg(info, X_INFO, "third quadrant\n"); 
+    //xf86IDrvMsg(info, X_INFO, "third quadrant\n"); 
   }
   else if (x <= 0 && y >= 0) {
     //Forth quadrant
     new_angle = (M_PI * 3.0 / 2.0) + new_angle;
-    xf86IDrvMsg(info, X_INFO, "fourth quadrant\n"); 
+    //xf86IDrvMsg(info, X_INFO, "fourth quadrant\n"); 
   }
   else if (x >= 0 && y <= 0) {
     //Second quardant
     new_angle = new_angle + (M_PI / 2.0);
-    xf86IDrvMsg(info, X_INFO, "second quadrant\n"); 
+    //xf86IDrvMsg(info, X_INFO, "second quadrant\n"); 
   }
   else if (x >= 0 && y >= 0) {
     //First quarant
     new_angle = (M_PI / 2) - new_angle;
-    xf86IDrvMsg(info, X_INFO, "first quadrant\n"); 
+    //xf86IDrvMsg(info, X_INFO, "first quadrant\n"); 
   }
 
   new_angle += angle;
@@ -102,7 +102,7 @@ static void translate_coordinates_to_angle (struct ir *ir,
 
   rotated_x *= ((double) IR_MAX_X / (double) IR_MAX_Y);
 
-  xf86IDrvMsg(info, X_INFO, "position (%d, %d), rotated (%d, %d) accelerometer angle: (%f)\n", ir->x, ir->y, (int) rotated_x, (int) rotated_y, TO_DEGREES(angle)); 
+  //xf86IDrvMsg(info, X_INFO, "position (%d, %d), rotated (%d, %d) accelerometer angle: (%f)\n", ir->x, ir->y, (int) rotated_x, (int) rotated_y, TO_DEGREES(angle)); 
 
   ir->x = (int) rotated_x;
   ir->y = (int) rotated_y;
@@ -321,7 +321,7 @@ void handle_ir_event(struct ir *ir,
                      InputInfoPtr info)
 {
   if (calculate_ir_coordinates(ir, config, ev, info) && config->remove_rotation) {
-    xf86IDrvMsg(info, X_INFO, "position (%d, %d)\n", ir->x, ir->y); 
+    //xf86IDrvMsg(info, X_INFO, "position (%d, %d)\n", ir->x, ir->y); 
     translate_coordinates_to_angle (ir, config, angle, info);
     calculate_continuous_scrolling_delta(ir, config, ev, info); 
   }

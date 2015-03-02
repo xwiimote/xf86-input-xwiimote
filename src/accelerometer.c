@@ -109,6 +109,8 @@ void handle_accelerometer_event(struct accelerometer *accelerometer,
 	r = y % ACCELEROMETER_HISTORY_MOD;
 	y -= r;
 
+  xf86IDrvMsg(info, X_INFO, "%f %d %f\n", accelerometer->smooth_rotate_angle, accelerometer->is_in_deadzone, config->angle_deadzone);
+  
   calculate_angle(accelerometer, config, ev, info);
 }
 
@@ -121,11 +123,13 @@ static void smooth_rotate(struct accelerometer *accelerometer,
   double counter_clockwise_distance = 0.0;
   double clockwise_distance = 0.0;
   double distance = previous_angle - angle;
+  double angle_delta = 0.0;
 
-  if (distance > config->angle_deadzone) {
+  if (fabs(distance) > config->angle_deadzone) {
     accelerometer->is_in_deadzone  = FALSE;
+    angle_delta = config->max_angle_delta;
   } else if (accelerometer->is_in_deadzone) {
-    return;
+    angle_delta = config->max_deadzone_angle_delta;
   }
 
   if (distance > 0.0) {
@@ -140,16 +144,16 @@ static void smooth_rotate(struct accelerometer *accelerometer,
   }
 
   if (clockwise_distance < counter_clockwise_distance) {
-    if (clockwise_distance <= config->max_angle_delta) {
+    if (clockwise_distance <= angle_delta) {
       previous_angle = angle;
     } else {
-      previous_angle += config->max_angle_delta;
+      previous_angle += angle_delta;
     }
   } else {
-    if (counter_clockwise_distance <= config->max_angle_delta) {
+    if (counter_clockwise_distance <= angle_delta) {
        previous_angle = angle;
     } else {
-      previous_angle -= config->max_angle_delta;
+      previous_angle -= angle_delta;
     }
   }
 
@@ -186,6 +190,12 @@ void configure_accelerometer(struct accelerometer_config *config,
 	t = xf86FindOptionValue(info->options, option_key);
   if (parse_double_with_default(t, &config->max_angle_delta, ACCELEROMETER_MAX_ANGLE_DELTA)) {
     xf86IDrvMsg(info, X_INFO, "%s %f\n", option_key, config->max_angle_delta);
+  }
+
+  snprintf(option_key, sizeof(option_key), "%sAccelerometerMaxDeadzoneAngleDelta", prefix);
+	t = xf86FindOptionValue(info->options, option_key);
+  if (parse_double_with_default(t, &config->max_deadzone_angle_delta, ACCELEROMETER_MAX_DEADZONE_ANGLE_DELTA)) {
+    xf86IDrvMsg(info, X_INFO, "%s %f\n", option_key, config->max_deadzone_angle_delta);
   }
 
   snprintf(option_key, sizeof(option_key), "%sAccelerometerAngleDeadzone", prefix);

@@ -14,8 +14,9 @@
 #define ACCELEROMETER_HISTORY_NUM 12
 #define ACCELEROMETER_HISTORY_MOD 2
 
+#define ACCELEROMETER_MAX_DEADZONE_ANGLE_DELTA 0.001
 #define ACCELEROMETER_MAX_ANGLE_DELTA 0.1
-#define ACCELEROMETER_ANGLE_DEADZONE 2.5
+#define ACCELEROMETER_ANGLE_DEADZONE 10.0
 
 struct accelerometer {
 	struct xwii_event_abs accel_history_ev[ACCELEROMETER_HISTORY_NUM];
@@ -28,6 +29,7 @@ struct accelerometer {
 
 struct accelerometer_config {
   double max_angle_delta;
+  double max_deadzone_angle_delta;
   double angle_deadzone;
 };
 
