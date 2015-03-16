@@ -2,6 +2,7 @@
  * XWiimote
  *
  * Copyright (c) 2011-2013 David Herrmann <dh.herrmann@gmail.com>
+ * Copyright (c) 2015 Zachary Dovel<zakkudo2@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -39,117 +40,17 @@
 #include <xf86.h>
 #include <xf86Module.h>
 #include <xf86Xinput.h>
+#include <xf86_OSproc.h>
 #include <xkbsrv.h>
 #include <xkbstr.h>
 #include <xorgVersion.h>
 #include <xserver-properties.h>
 #include <xwiimote.h>
 
-#define MIN_KEYCODE 8
-
-#define XWIIMOTE_ACCEL_HISTORY_NUM 12
-#define XWIIMOTE_ACCEL_HISTORY_MOD 2
-
-#define XWIIMOTE_IR_AVG_RADIUS 10
-#define XWIIMOTE_IR_AVG_MAX_SAMPLES 8
-#define XWIIMOTE_IR_AVG_MIN_SAMPLES 4
-#define XWIIMOTE_IR_AVG_WEIGHT 3
-
-#define XWIIMOTE_IR_KEYMAP_EXPIRY_SECS 1
-
-#define XWIIMOTE_DISTSQ(ax, ay, bx, by) \
-	((ax - bx) * (ax - bx) + (ay - by) * (ay - by))
+#include "xwiimote.h"
+#include "properties.h"
 
 static char xwiimote_name[] = "xwiimote";
-
-enum func_type {
-	FUNC_IGNORE,
-	FUNC_BTN,
-	FUNC_KEY,
-};
-
-struct func {
-	int type;
-	union {
-		int btn;
-		unsigned int key;
-	} u;
-};
-
-static struct func map_key_default[XWII_KEY_NUM] = {
-	[XWII_KEY_LEFT] = { .type = FUNC_KEY, .u.key = KEY_LEFT },
-	[XWII_KEY_RIGHT] = { .type = FUNC_KEY, .u.key = KEY_RIGHT },
-	[XWII_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
-	[XWII_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
-	[XWII_KEY_A] = { .type = FUNC_KEY, .u.key = KEY_ENTER },
-	[XWII_KEY_B] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
-	[XWII_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEUP },
-	[XWII_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_VOLUMEDOWN },
-	[XWII_KEY_HOME] = { .type = FUNC_KEY, .u.key = KEY_ESC },
-	[XWII_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
-	[XWII_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
-};
-
-enum motion_type {
-	MOTION_NONE,
-	MOTION_ABS,
-	MOTION_REL,
-};
-
-enum motion_source {
-	SOURCE_NONE,
-	SOURCE_ACCEL,
-	SOURCE_IR,
-	SOURCE_MOTIONPLUS,
-};
-
-enum keyset {
-	KEYSET_NORMAL,
-	KEYSET_IR,
-
-	KEYSET_NUM
-};
-
-struct xwiimote_dev {
-	InputInfoPtr info;
-	void *handler;
-	int dev_id;
-	char *root;
-	const char *device;
-	bool dup;
-	struct xwii_iface *iface;
-	unsigned int ifs;
-
-	XkbRMLVOSet rmlvo;
-	unsigned int motion;
-	unsigned int motion_source;
-	struct func map_key[KEYSET_NUM][XWII_KEY_NUM];
-	enum keyset key_pressed[XWII_KEY_NUM];
-	unsigned int mp_x;
-	unsigned int mp_y;
-	unsigned int mp_z;
-	int mp_x_scale;
-	int mp_y_scale;
-	int mp_z_scale;
-
-	struct timeval ir_last_valid_event;
-	int ir_vec_x;
-	int ir_vec_y;
-	int ir_ref_x;
-	int ir_ref_y;
-	int ir_avg_x;
-	int ir_avg_y;
-	int ir_avg_count;
-
-	int ir_avg_radius;
-	int ir_avg_max_samples;
-	int ir_avg_min_samples;
-	int ir_avg_weight;
-	int ir_keymap_expiry_secs;
-
-	struct xwii_event_abs accel_history_ev[XWIIMOTE_ACCEL_HISTORY_NUM];
-	int accel_history_cur;
-};
 
 /* List of all devices we know about to avoid duplicates */
 static struct xwiimote_dev *xwiimote_devices[MAXDEVICES + 1];
@@ -242,9 +143,11 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	char btn1[] = BTN_LABEL_PROP_BTN_LEFT;
 	char btn2[] = BTN_LABEL_PROP_BTN_RIGHT;
 	char btn3[] = BTN_LABEL_PROP_BTN_MIDDLE;
-	unsigned char map[] = { 0, 1, 2, 3 };
+	char btn4[] = BTN_LABEL_PROP_BTN_WHEEL_UP;
+	char btn5[] = BTN_LABEL_PROP_BTN_WHEEL_DOWN;
+	unsigned char map[] = { 0, 1, 2, 3, 4, 5 };
 
-	num = 4;
+	num = 6;
 	atoms = malloc(sizeof(*atoms) * num);
 	if (!atoms)
 		return BadAlloc;
@@ -254,6 +157,8 @@ static int xwiimote_prepare_btn(struct xwiimote_dev *dev, DeviceIntPtr device)
 	atoms[1] = XIGetKnownProperty(btn1);
 	atoms[2] = XIGetKnownProperty(btn2);
 	atoms[3] = XIGetKnownProperty(btn3);
+	atoms[4] = XIGetKnownProperty(btn4);
+	atoms[5] = XIGetKnownProperty(btn5);
 
 	if (!InitButtonClassDeviceStruct(device, 1, atoms, map)) {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot init button class\n");
@@ -336,6 +241,7 @@ err_out:
 static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
 	int ret;
+  struct wiimote_config *wiimote_config;
 
 	ret = xwiimote_prepare_key(dev, device);
 	if (ret != Success)
@@ -345,20 +251,32 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 	if (ret != Success)
 		return ret;
 
-	switch(dev->motion_source) {
-	case SOURCE_ACCEL:
-		ret = xwiimote_prepare_abs(dev, device, -100, 100, -100, 100);
-		break;
-	case SOURCE_MOTIONPLUS:
-		ret = xwiimote_prepare_rel(dev, device, -10000, 10000, -10000, 10000);
-		break;
-	case SOURCE_IR:
-		ret = xwiimote_prepare_abs(dev, device, 0, 1023, 0, 767);
-		break;
-	default:
-		ret = Success;
-		break;
+  wiimote_config = &dev->wiimote_config[dev->motion_layout];
+
+	switch(wiimote_config->motion_source) {
+    case WIIMOTE_MOTION_SOURCE_ACCELEROMETER:
+      ret = xwiimote_prepare_abs(dev, device,
+        ACCELEROMETER_MIN_X, ACCELEROMETER_MAX_X,
+        ACCELEROMETER_MIN_Y, ACCELEROMETER_MAX_Y);
+      break;
+    case WIIMOTE_MOTION_SOURCE_MOTIONPLUS:
+      ret = xwiimote_prepare_rel(dev, device,
+        MOTIONPLUS_MIN_X, MOTIONPLUS_MAX_X,
+        MOTIONPLUS_MIN_Y, MOTIONPLUS_MAX_Y);
+      break;
+    case WIIMOTE_MOTION_SOURCE_IR:
+      ret = xwiimote_prepare_abs(dev, device,
+        (IR_MIN_X) * IR_TO_SCREEN_RATIO,
+        (IR_MAX_X) * IR_TO_SCREEN_RATIO,
+        (IR_MIN_Y) * IR_TO_SCREEN_RATIO,
+        (IR_MAX_Y) * IR_TO_SCREEN_RATIO);
+      break;
+    default:
+      ret = Success;
+      break;
 	}
+
+  xwiimote_initialize_properties(device, dev);
 
 	if (ret != Success)
 		return ret;
@@ -368,243 +286,137 @@ static int xwiimote_init(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 static int xwiimote_close(struct xwiimote_dev *dev, DeviceIntPtr device)
 {
+  if (dev->timer != NULL) {
+    TimerCancel(dev->timer);
+    dev->timer = NULL;
+  }
+  close_wiimote(&dev->wiimote);
 	return Success;
 }
 
-static void xwiimote_key(struct xwiimote_dev *dev, struct xwii_event *ev)
+static unsigned int calculate_next_key_layout(struct key *key, 
+                                              unsigned int motion_layout)
 {
-	unsigned int code;
-	unsigned int state;
-	unsigned int key;
-	int btn;
-	int absolute = 0;
-	enum keyset keyset = KEYSET_NORMAL;
+  unsigned int layout;
 
-	code = ev->v.key.code;
-	state = ev->v.key.state;
-	if (code >= XWII_KEY_NUM)
-		return;
-	if (state > 1)
-		return;
+  if (key->state) {
+    switch(key->state) {
+      case KEY_STATE_PRESSED_WITH_IR:
+        layout = KEY_LAYOUT_IR;
+        break;
+      default:
+      case KEY_STATE_PRESSED:
+        layout = KEY_LAYOUT_DEFAULT;
+        break;
+    }
+  } else {
+    layout = motion_layout;
+  }
 
-	if (dev->motion == MOTION_ABS)
-		absolute = 1;
-
-	if (ev->v.key.state) {
-		if (ev->time.tv_sec < dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
-				|| (ev->time.tv_sec == dev->ir_last_valid_event.tv_sec + dev->ir_keymap_expiry_secs
-					&& ev->time.tv_usec < dev->ir_last_valid_event.tv_usec)) {
-			keyset = KEYSET_IR;
-		}
-		dev->key_pressed[code] = keyset;
-	} else {
-		keyset = dev->key_pressed[code];
-	}
-
-	switch (dev->map_key[keyset][code].type) {
-		case FUNC_BTN:
-			btn = dev->map_key[keyset][code].u.btn;
-			xf86PostButtonEvent(dev->info->dev, absolute, btn,
-								state, 0, 0);
-			break;
-		case FUNC_KEY:
-			key = dev->map_key[keyset][code].u.key + MIN_KEYCODE;
-			xf86PostKeyboardEvent(dev->info->dev, key, state);
-			break;
-		case FUNC_IGNORE:
-			/* fallthrough */
-		default:
-			break;
-	}
+  return layout;
 }
 
-static void xwiimote_accel(struct xwiimote_dev *dev, struct xwii_event *ev)
+static unsigned int calculate_next_key_state(struct key *key,
+	                                           struct xwii_event ev,
+                                             unsigned int motion_layout)
 {
-	int32_t x, y, r;
-	int absolute, i;
+  unsigned int state;
 
-	if (dev->motion_source != SOURCE_ACCEL)
-		return;
+  if (key->state && ev.v.key.state) {
+    state = key->state;
+  } else if (!key->state && ev.v.key.state) {
+    switch(motion_layout) {
+      case KEY_LAYOUT_IR:
+        state = KEY_STATE_PRESSED_WITH_IR;
+        break;
+      default:
+      case KEY_LAYOUT_DEFAULT:
+        state = KEY_STATE_PRESSED;
+        break;
+    }
+  } else {
+    state = KEY_STATE_RELEASED;
+  }
 
-	++dev->accel_history_cur;
-	dev->accel_history_cur %= XWIIMOTE_ACCEL_HISTORY_NUM;
-	dev->accel_history_ev[dev->accel_history_cur] = ev->v.abs[0];
-
-	/* choose the smallest one */
-	x = dev->accel_history_ev[0].x;
-	y = dev->accel_history_ev[0].y;
-	for (i = 1; i < XWIIMOTE_ACCEL_HISTORY_NUM; i++) {
-		if (dev->accel_history_ev[i].x < x)
-			x = dev->accel_history_ev[i].x;
-		if (dev->accel_history_ev[i].y < y)
-			y = dev->accel_history_ev[i].y;
-	}
-
-	/* limit values to make it more stable */
-	r = x % XWIIMOTE_ACCEL_HISTORY_MOD;
-	x -= r;
-	r = y % XWIIMOTE_ACCEL_HISTORY_MOD;
-	y -= r;
-
-	absolute = dev->motion == MOTION_ABS;
-	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, y);
+  return state;
 }
 
-static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
+static unsigned int calculate_next_analog_stick_state(struct analog_stick *analog_stick,
+                                                      unsigned int motion_layout)
 {
-	struct xwii_event_abs *a, *b, *c, d;
-	int absolute, i, dists[6];
+  unsigned int state;
 
-	absolute = dev->motion == MOTION_ABS;
+  state = analog_stick->state;
+  if (!state) {
+    switch(motion_layout) {
+      case KEY_LAYOUT_IR:
+        state = KEY_STATE_PRESSED_WITH_IR;
+        break;
+      case KEY_LAYOUT_DEFAULT:
+      default:
+        state = KEY_STATE_PRESSED;
+        break;
+    }
+  }
 
-	if (dev->motion_source != SOURCE_IR)
-		return;
-
-	/* Grab first two valid points */
-	a = b = NULL;
-	for (i = 0; i < 4; ++i) {
-		c = &ev->v.abs[i];
-		if (xwii_event_ir_is_valid(c) && (c->x || c->y)) {
-			if (!a) {
-				a = c;
-			} else if (!b) {
-				b = c;
-			} else {
-				/* This may be a noisy point. Keep the two points that are
-				 * closest to the reference points. */
-				d.x = dev->ir_ref_x + dev->ir_vec_x;
-				d.y = dev->ir_ref_y + dev->ir_vec_y;
-				dists[0] = XWIIMOTE_DISTSQ(c->x, c->y, dev->ir_ref_x, dev->ir_ref_y);
-				dists[1] = XWIIMOTE_DISTSQ(c->x, c->y, d.x, d.y);
-				dists[2] = XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_ref_x, dev->ir_ref_y);
-				dists[3] = XWIIMOTE_DISTSQ(a->x, a->y, d.x, d.y);
-				dists[4] = XWIIMOTE_DISTSQ(b->x, b->y, dev->ir_ref_x, dev->ir_ref_y);
-				dists[5] = XWIIMOTE_DISTSQ(b->x, b->y, d.x, d.y);
-				if (dists[1] < dists[0]) dists[0] = dists[1];
-				if (dists[3] < dists[2]) dists[2] = dists[3];
-				if (dists[5] < dists[4]) dists[4] = dists[5];
-				if (dists[0] < dists[2]) {
-					if (dists[4] < dists[2]) {
-						a = c;
-					} else {
-						b = c;
-					}
-				} else if (dists[0] < dists[4]) {
-					b = c;
-				}
-			}
-		}
-	}
-	if (!a)
-		return;
-
-	if (!b) {
-		/* Generate the second point based on historical data */
-		b = &d;
-		b->x = a->x - dev->ir_vec_x;
-		b->y = a->y - dev->ir_vec_y;
-		if (XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_ref_x, dev->ir_ref_y)
-				< XWIIMOTE_DISTSQ(b->x, b->y, dev->ir_ref_x, dev->ir_ref_y)) {
-			b->x = a->x + dev->ir_vec_x;
-			b->y = a->y + dev->ir_vec_y;
-			dev->ir_ref_x = a->x;
-			dev->ir_ref_y = a->y;
-		} else {
-			dev->ir_ref_x = b->x;
-			dev->ir_ref_y = b->y;
-		}
-	} else {
-		/* Record some data in case one of the points disappears */
-		dev->ir_vec_x = b->x - a->x;
-		dev->ir_vec_y = b->y - a->y;
-		dev->ir_ref_x = a->x;
-		dev->ir_ref_y = a->y;
-	}
-
-	/* Final point is the average of both points */
-	a->x = (a->x + b->x) / 2;
-	a->y = (a->y + b->y) / 2;
-
-	/* Start averaging if the location is consistant */
-	dev->ir_avg_x = (dev->ir_avg_x * dev->ir_avg_count + a->x) / (dev->ir_avg_count+1);
-	dev->ir_avg_y = (dev->ir_avg_y * dev->ir_avg_count + a->y) / (dev->ir_avg_count+1);
-	if (++dev->ir_avg_count > dev->ir_avg_max_samples)
-		dev->ir_avg_count = dev->ir_avg_max_samples;
-	if (XWIIMOTE_DISTSQ(a->x, a->y, dev->ir_avg_x, dev->ir_avg_y)
-			< dev->ir_avg_radius * dev->ir_avg_radius) {
-		if (dev->ir_avg_count >= dev->ir_avg_min_samples) {
-			a->x = (a->x + dev->ir_avg_x * dev->ir_avg_weight) / (dev->ir_avg_weight+1);
-			a->y = (a->y + dev->ir_avg_y * dev->ir_avg_weight) / (dev->ir_avg_weight+1);
-		}
-	} else {
-		dev->ir_avg_count = 0;
-	}
-
-	xf86PostMotionEvent(dev->info->dev, absolute, 0, 2,
-				1023 - a->x, a->y);
-
-	dev->ir_last_valid_event = ev->time;
+  return state;
 }
 
-static int32_t get_mp_axis(struct xwiimote_dev *dev,
-			   struct xwii_event *ev,
-			   unsigned int axis)
+static unsigned int calculate_next_analog_stick_layout(struct analog_stick *analog_stick,
+                                                       unsigned int motion_layout)
 {
-	switch (axis) {
-	case 0:
-		axis = dev->mp_x;
-		break;
-	case 1:
-		axis = dev->mp_y;
-		break;
-	case 2:
-		axis = dev->mp_z;
-		break;
-	default:
-		return 0;
-	}
+  unsigned int layout;
 
-	switch (axis) {
-	case 0:
-		return ev->v.abs[0].x * dev->mp_x_scale;
-	case 1:
-		return ev->v.abs[0].y * dev->mp_y_scale;
-	case 2:
-		return ev->v.abs[0].z * dev->mp_z_scale;
-	default:
-		return 0;
-	}
+  if (analog_stick->state) {
+    switch(analog_stick->state) {
+      case KEY_STATE_PRESSED_WITH_IR:
+        layout = KEY_LAYOUT_IR;
+        break;
+      default:
+      case KEY_STATE_PRESSED:
+        layout = KEY_LAYOUT_DEFAULT;
+        break;
+    }
+  } else {
+    layout = motion_layout;
+  }
+
+  return layout;
 }
 
-static void xwiimote_motionplus(struct xwiimote_dev *dev, struct xwii_event *ev)
+static CARD32
+handle_xwiimote_timer(OsTimerPtr        timer,
+                       CARD32            atime,
+                       pointer           arg)
 {
-	int32_t x, z;
-	int absolute;
+  struct xwiimote_dev *dev = arg;
+  unsigned int state;
 
-	absolute = dev->motion == MOTION_ABS;
+  int sigstate= xf86BlockSIGIO();
 
-	if (dev->motion_source == SOURCE_MOTIONPLUS) {
-		x = get_mp_axis(dev, ev, 0) / 100;
-		z = get_mp_axis(dev, ev, 2) / 100;
-		xf86PostMotionEvent(dev->info->dev, absolute, 0, 2, x, z);
-	}
+  state = dev->motion_layout = KEY_LAYOUT_IR;
+  handle_wiimote_timer(&dev->wiimote, &dev->wiimote_config[state], dev->info);
+
+  xf86UnblockSIGIO (sigstate);
+
+  return 1;
 }
 
-static void xwiimote_refresh(struct xwiimote_dev *dev)
-{
-	int ret;
-
-	ret = xwii_iface_open(dev->iface, dev->ifs);
-	if (ret)
-		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
-}
-
-static void xwiimote_input(int fd, pointer data)
+static void handle_xwiimote_event(int fd, pointer data)
 {
 	struct xwiimote_dev *dev = data;
 	InputInfoPtr info = dev->info;
 	struct xwii_event ev;
 	int ret;
+
+  struct wiimote *wiimote = &dev->wiimote;
+  struct nunchuk *nunchuk = &dev->nunchuk;
+
+  struct wiimote_config *wiimote_config;
+  struct nunchuk_config *nunchuk_config;
+  unsigned int state;
+  unsigned int layout;
+  unsigned int keycode;
 
 	dev = info->private;
 	if (dev->dup)
@@ -616,23 +428,72 @@ static void xwiimote_input(int fd, pointer data)
 		if (ret)
 			break;
 
+    if (wiimote_ir_is_active (wiimote, &dev->wiimote_config[dev->motion_layout], &ev)) {
+      dev->motion_layout = KEY_LAYOUT_IR;
+    } else {
+      dev->motion_layout = KEY_LAYOUT_DEFAULT;
+    } 
+
 		switch (ev.type) {
 			case XWII_EVENT_WATCH:
-				xwiimote_refresh(dev);
-				break;
+        if(!xwii_iface_open(dev->iface, xwii_iface_available(dev->iface)))
+          xf86IDrvMsg(info, X_INFO, "Cannot open all requested interfaces\n");
+        break;
 			case XWII_EVENT_KEY:
-				xwiimote_key(dev, &ev);
+        keycode = xwii_key_to_wiimote_key(ev.v.key.code, info);
+        layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
+        state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
+        wiimote_config = &dev->wiimote_config[layout];
+				handle_wiimote_key_event(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_ACCEL:
-				xwiimote_accel(dev, &ev);
+        layout = dev->motion_layout;
+        state = dev->motion_layout;
+        wiimote_config = &dev->wiimote_config[layout];
+				handle_wiimote_accelerometer_event(wiimote, wiimote_config, &ev, state, info);
 				break;
 			case XWII_EVENT_IR:
-				xwiimote_ir(dev, &ev);
+        switch(dev->motion_layout) {
+          case KEY_LAYOUT_IR:
+            state = KEY_STATE_PRESSED_WITH_IR;
+            break;
+          default:
+          case KEY_LAYOUT_DEFAULT:
+            state = KEY_STATE_PRESSED;
+            break;
+        }
+        wiimote_config = &dev->wiimote_config[dev->motion_layout];
+				handle_wiimote_ir_event(wiimote, wiimote_config, &ev, state, info);
 			case XWII_EVENT_MOTION_PLUS:
-				xwiimote_motionplus(dev, &ev);
+        layout = dev->motion_layout;
+        state = dev->motion_layout;
+        wiimote_config = &dev->wiimote_config[layout];
+				handle_wiimote_motionplus_event(wiimote, wiimote_config, &ev, state, info);
+				break;
+			case XWII_EVENT_NUNCHUK_KEY:
+        keycode = xwii_key_to_nunchuk_key(ev.v.key.code, info);
+        layout = calculate_next_key_layout(&wiimote->keys[keycode], dev->motion_layout);
+        state = calculate_next_key_state(&wiimote->keys[keycode], ev, layout);
+        nunchuk_config = &dev->nunchuk_config[layout];
+				handle_nunchuk_key_event(nunchuk, nunchuk_config, &ev, state, info);
+				break;
+			case XWII_EVENT_NUNCHUK_MOVE:
+        layout = calculate_next_analog_stick_layout(&nunchuk->analog_stick, dev->motion_layout);
+        state = calculate_next_analog_stick_state(&nunchuk->analog_stick, layout);
+        nunchuk_config = &dev->nunchuk_config[layout];
+				handle_nunchuk_analog_stick_event(nunchuk, nunchuk_config, &ev, state, info);
 				break;
 		}
 	} while (!ret);
+
+  if (!dev->timer) {
+    dev->timer = TimerSet(
+          dev->timer,
+          0,         
+          1000,
+          handle_xwiimote_timer,
+          dev);
+  }
 
 	if (ret != -EAGAIN) {
 		xf86IDrvMsg(info, X_INFO, "Device disconnected\n");
@@ -647,7 +508,8 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 	int ret;
 	InputInfoPtr info = device->public.devicePrivate;
 
-	ret = xwii_iface_open(dev->iface, dev->ifs);
+	ret = xwii_iface_open(dev->iface, xwii_iface_available(dev->iface));
+
 	if (ret)
 		xf86IDrvMsg(dev->info, X_INFO, "Cannot open all requested interfaces\n");
 
@@ -657,7 +519,7 @@ static int xwiimote_on(struct xwiimote_dev *dev, DeviceIntPtr device)
 
 	info->fd = xwii_iface_get_fd(dev->iface);
 	if (info->fd >= 0) {
-		dev->handler = xf86AddInputHandler(info->fd, xwiimote_input, dev);
+		dev->handler = xf86AddInputHandler(info->fd, handle_xwiimote_event, dev);
 	} else {
 		xf86IDrvMsg(dev->info, X_ERROR, "Cannot get interface fd\n");
 	}
@@ -750,7 +612,7 @@ static BOOL xwiimote_validate(struct xwiimote_dev *dev)
 	driver = udev_device_get_driver(p);
 	subs = udev_device_get_subsystem(p);
 	if (!driver || strcmp(driver, "wiimote") ||
-	    !subs || strcmp(subs, "hid")) {
+		!subs || strcmp(subs, "hid")) {
 		xf86IDrvMsg(dev->info, X_ERROR, "No Wii Remote HID device\n");
 		ret = FALSE;
 		goto err_dev;
@@ -788,751 +650,169 @@ err_udev:
 	return ret;
 }
 
-static struct key_value_pair {
-	const char *key;
-	unsigned int value;
-} key2value[] = {
-	{ "KEY_ESC", 1 },
-	{ "KEY_1", 2 },
-	{ "KEY_2", 3 },
-	{ "KEY_3", 4 },
-	{ "KEY_4", 5 },
-	{ "KEY_5", 6 },
-	{ "KEY_6", 7 },
-	{ "KEY_7", 8 },
-	{ "KEY_8", 9 },
-	{ "KEY_9", 10 },
-	{ "KEY_0", 11 },
-	{ "KEY_MINUS", 12 },
-	{ "KEY_EQUAL", 13 },
-	{ "KEY_BACKSPACE", 14 },
-	{ "KEY_TAB", 15 },
-	{ "KEY_Q", 16 },
-	{ "KEY_W", 17 },
-	{ "KEY_E", 18 },
-	{ "KEY_R", 19 },
-	{ "KEY_T", 20 },
-	{ "KEY_Y", 21 },
-	{ "KEY_U", 22 },
-	{ "KEY_I", 23 },
-	{ "KEY_O", 24 },
-	{ "KEY_P", 25 },
-	{ "KEY_LEFTBRACE", 26 },
-	{ "KEY_RIGHTBRACE", 27 },
-	{ "KEY_ENTER", 28 },
-	{ "KEY_LEFTCTRL", 29 },
-	{ "KEY_A", 30 },
-	{ "KEY_S", 31 },
-	{ "KEY_D", 32 },
-	{ "KEY_F", 33 },
-	{ "KEY_G", 34 },
-	{ "KEY_H", 35 },
-	{ "KEY_J", 36 },
-	{ "KEY_K", 37 },
-	{ "KEY_L", 38 },
-	{ "KEY_SEMICOLON", 39 },
-	{ "KEY_APOSTROPHE", 40 },
-	{ "KEY_GRAVE", 41 },
-	{ "KEY_LEFTSHIFT", 42 },
-	{ "KEY_BACKSLASH", 43 },
-	{ "KEY_Z", 44 },
-	{ "KEY_X", 45 },
-	{ "KEY_C", 46 },
-	{ "KEY_V", 47 },
-	{ "KEY_B", 48 },
-	{ "KEY_N", 49 },
-	{ "KEY_M", 50 },
-	{ "KEY_COMMA", 51 },
-	{ "KEY_DOT", 52 },
-	{ "KEY_SLASH", 53 },
-	{ "KEY_RIGHTSHIFT", 54 },
-	{ "KEY_KPASTERISK", 55 },
-	{ "KEY_LEFTALT", 56 },
-	{ "KEY_SPACE", 57 },
-	{ "KEY_CAPSLOCK", 58 },
-	{ "KEY_F1", 59 },
-	{ "KEY_F2", 60 },
-	{ "KEY_F3", 61 },
-	{ "KEY_F4", 62 },
-	{ "KEY_F5", 63 },
-	{ "KEY_F6", 64 },
-	{ "KEY_F7", 65 },
-	{ "KEY_F8", 66 },
-	{ "KEY_F9", 67 },
-	{ "KEY_F10", 68 },
-	{ "KEY_NUMLOCK", 69 },
-	{ "KEY_SCROLLLOCK", 70 },
-	{ "KEY_KP7", 71 },
-	{ "KEY_KP8", 72 },
-	{ "KEY_KP9", 73 },
-	{ "KEY_KPMINUS", 74 },
-	{ "KEY_KP4", 75 },
-	{ "KEY_KP5", 76 },
-	{ "KEY_KP6", 77 },
-	{ "KEY_KPPLUS", 78 },
-	{ "KEY_KP1", 79 },
-	{ "KEY_KP2", 80 },
-	{ "KEY_KP3", 81 },
-	{ "KEY_KP0", 82 },
-	{ "KEY_KPDOT", 83 },
-	{ "KEY_ZENKAKUHANKAKU", 85 },
-	{ "KEY_102ND", 86 },
-	{ "KEY_F11", 87 },
-	{ "KEY_F12", 88 },
-	{ "KEY_RO", 89 },
-	{ "KEY_KATAKANA", 90 },
-	{ "KEY_HIRAGANA", 91 },
-	{ "KEY_HENKAN", 92 },
-	{ "KEY_KATAKANAHIRAGANA", 93 },
-	{ "KEY_MUHENKAN", 94 },
-	{ "KEY_KPJPCOMMA", 95 },
-	{ "KEY_KPENTER", 96 },
-	{ "KEY_RIGHTCTRL", 97 },
-	{ "KEY_KPSLASH", 98 },
-	{ "KEY_SYSRQ", 99 },
-	{ "KEY_RIGHTALT", 100 },
-	{ "KEY_LINEFEED", 101 },
-	{ "KEY_HOME", 102 },
-	{ "KEY_UP", 103 },
-	{ "KEY_PAGEUP", 104 },
-	{ "KEY_LEFT", 105 },
-	{ "KEY_RIGHT", 106 },
-	{ "KEY_END", 107 },
-	{ "KEY_DOWN", 108 },
-	{ "KEY_PAGEDOWN", 109 },
-	{ "KEY_INSERT", 110 },
-	{ "KEY_DELETE", 111 },
-	{ "KEY_MACRO", 112 },
-	{ "KEY_MUTE", 113 },
-	{ "KEY_VOLUMEDOWN", 114 },
-	{ "KEY_VOLUMEUP", 115 },
-	{ "KEY_POWER", 116 },
-	{ "KEY_KPEQUAL", 117 },
-	{ "KEY_KPPLUSMINUS", 118 },
-	{ "KEY_PAUSE", 119 },
-	{ "KEY_SCALE", 120 },
-	{ "KEY_KPCOMMA", 121 },
-	{ "KEY_HANGEUL", 122 },
-	{ "KEY_HANGUEL", 122 },
-	{ "KEY_HANJA", 123 },
-	{ "KEY_YEN", 124 },
-	{ "KEY_LEFTMETA", 125 },
-	{ "KEY_RIGHTMETA", 126 },
-	{ "KEY_COMPOSE", 127 },
-	{ "KEY_STOP", 128 },
-	{ "KEY_AGAIN", 129 },
-	{ "KEY_PROPS", 130 },
-	{ "KEY_UNDO", 131 },
-	{ "KEY_FRONT", 132 },
-	{ "KEY_COPY", 133 },
-	{ "KEY_OPEN", 134 },
-	{ "KEY_PASTE", 135 },
-	{ "KEY_FIND", 136 },
-	{ "KEY_CUT", 137 },
-	{ "KEY_HELP", 138 },
-	{ "KEY_MENU", 139 },
-	{ "KEY_CALC", 140 },
-	{ "KEY_SETUP", 141 },
-	{ "KEY_SLEEP", 142 },
-	{ "KEY_WAKEUP", 143 },
-	{ "KEY_FILE", 144 },
-	{ "KEY_SENDFILE", 145 },
-	{ "KEY_DELETEFILE", 146 },
-	{ "KEY_XFER", 147 },
-	{ "KEY_PROG1", 148 },
-	{ "KEY_PROG2", 149 },
-	{ "KEY_WWW", 150 },
-	{ "KEY_MSDOS", 151 },
-	{ "KEY_COFFEE", 152 },
-	{ "KEY_SCREENLOCK", 152 },
-	{ "KEY_DIRECTION", 153 },
-	{ "KEY_CYCLEWINDOWS", 154 },
-	{ "KEY_MAIL", 155 },
-	{ "KEY_BOOKMARKS", 156 },
-	{ "KEY_COMPUTER", 157 },
-	{ "KEY_BACK", 158 },
-	{ "KEY_FORWARD", 159 },
-	{ "KEY_CLOSECD", 160 },
-	{ "KEY_EJECTCD", 161 },
-	{ "KEY_EJECTCLOSECD", 162 },
-	{ "KEY_NEXTSONG", 163 },
-	{ "KEY_PLAYPAUSE", 164 },
-	{ "KEY_PREVIOUSSONG", 165 },
-	{ "KEY_STOPCD", 166 },
-	{ "KEY_RECORD", 167 },
-	{ "KEY_REWIND", 168 },
-	{ "KEY_PHONE", 169 },
-	{ "KEY_ISO", 170 },
-	{ "KEY_CONFIG", 171 },
-	{ "KEY_HOMEPAGE", 172 },
-	{ "KEY_REFRESH", 173 },
-	{ "KEY_EXIT", 174 },
-	{ "KEY_MOVE", 175 },
-	{ "KEY_EDIT", 176 },
-	{ "KEY_SCROLLUP", 177 },
-	{ "KEY_SCROLLDOWN", 178 },
-	{ "KEY_KPLEFTPAREN", 179 },
-	{ "KEY_KPRIGHTPAREN", 180 },
-	{ "KEY_NEW", 181 },
-	{ "KEY_REDO", 182 },
-	{ "KEY_F13", 183 },
-	{ "KEY_F14", 184 },
-	{ "KEY_F15", 185 },
-	{ "KEY_F16", 186 },
-	{ "KEY_F17", 187 },
-	{ "KEY_F18", 188 },
-	{ "KEY_F19", 189 },
-	{ "KEY_F20", 190 },
-	{ "KEY_F21", 191 },
-	{ "KEY_F22", 192 },
-	{ "KEY_F23", 193 },
-	{ "KEY_F24", 194 },
-	{ "KEY_PLAYCD", 200 },
-	{ "KEY_PAUSECD", 201 },
-	{ "KEY_PROG3", 202 },
-	{ "KEY_PROG4", 203 },
-	{ "KEY_DASHBOARD", 204 },
-	{ "KEY_SUSPEND", 205 },
-	{ "KEY_CLOSE", 206 },
-	{ "KEY_PLAY", 207 },
-	{ "KEY_FASTFORWARD", 208 },
-	{ "KEY_BASSBOOST", 209 },
-	{ "KEY_PRINT", 210 },
-	{ "KEY_HP", 211 },
-	{ "KEY_CAMERA", 212 },
-	{ "KEY_SOUND", 213 },
-	{ "KEY_QUESTION", 214 },
-	{ "KEY_EMAIL", 215 },
-	{ "KEY_CHAT", 216 },
-	{ "KEY_SEARCH", 217 },
-	{ "KEY_CONNECT", 218 },
-	{ "KEY_FINANCE", 219 },
-	{ "KEY_SPORT", 220 },
-	{ "KEY_SHOP", 221 },
-	{ "KEY_ALTERASE", 222 },
-	{ "KEY_CANCEL", 223 },
-	{ "KEY_BRIGHTNESSDOWN", 224 },
-	{ "KEY_BRIGHTNESSUP", 225 },
-	{ "KEY_MEDIA", 226 },
-	{ "KEY_SWITCHVIDEOMODE", 227 },
-	{ "KEY_KBDILLUMTOGGLE", 228 },
-	{ "KEY_KBDILLUMDOWN", 229 },
-	{ "KEY_KBDILLUMUP", 230 },
-	{ "KEY_SEND", 231 },
-	{ "KEY_REPLY", 232 },
-	{ "KEY_FORWARDMAIL", 233 },
-	{ "KEY_SAVE", 234 },
-	{ "KEY_DOCUMENTS", 235 },
-	{ "KEY_BATTERY", 236 },
-	{ "KEY_BLUETOOTH", 237 },
-	{ "KEY_WLAN", 238 },
-	{ "KEY_UWB", 239 },
-	{ "KEY_UNKNOWN", 240 },
-	{ "KEY_VIDEO_NEXT", 241 },
-	{ "KEY_VIDEO_PREV", 242 },
-	{ "KEY_BRIGHTNESS_CYCLE", 243 },
-	{ "KEY_BRIGHTNESS_ZERO", 244 },
-	{ "KEY_DISPLAY_OFF", 245 },
-	{ "KEY_WIMAX", 246 },
-	{ "KEY_RFKILL", 247 },
-	{ "KEY_MICMUTE", 248 },
-	{ "BTN_MISC", 0x100 },
-	{ "BTN_0", 0x100 },
-	{ "BTN_1", 0x101 },
-	{ "BTN_2", 0x102 },
-	{ "BTN_3", 0x103 },
-	{ "BTN_4", 0x104 },
-	{ "BTN_5", 0x105 },
-	{ "BTN_6", 0x106 },
-	{ "BTN_7", 0x107 },
-	{ "BTN_8", 0x108 },
-	{ "BTN_9", 0x109 },
-	{ "BTN_MOUSE", 0x110 },
-	{ "BTN_LEFT", 0x110 },
-	{ "BTN_RIGHT", 0x111 },
-	{ "BTN_MIDDLE", 0x112 },
-	{ "BTN_SIDE", 0x113 },
-	{ "BTN_EXTRA", 0x114 },
-	{ "BTN_FORWARD", 0x115 },
-	{ "BTN_BACK", 0x116 },
-	{ "BTN_TASK", 0x117 },
-	{ "BTN_JOYSTICK", 0x120 },
-	{ "BTN_TRIGGER", 0x120 },
-	{ "BTN_THUMB", 0x121 },
-	{ "BTN_THUMB2", 0x122 },
-	{ "BTN_TOP", 0x123 },
-	{ "BTN_TOP2", 0x124 },
-	{ "BTN_PINKIE", 0x125 },
-	{ "BTN_BASE", 0x126 },
-	{ "BTN_BASE2", 0x127 },
-	{ "BTN_BASE3", 0x128 },
-	{ "BTN_BASE4", 0x129 },
-	{ "BTN_BASE5", 0x12a },
-	{ "BTN_BASE6", 0x12b },
-	{ "BTN_DEAD", 0x12f },
-	{ "BTN_GAMEPAD", 0x130 },
-	{ "BTN_A", 0x130 },
-	{ "BTN_B", 0x131 },
-	{ "BTN_C", 0x132 },
-	{ "BTN_X", 0x133 },
-	{ "BTN_Y", 0x134 },
-	{ "BTN_Z", 0x135 },
-	{ "BTN_TL", 0x136 },
-	{ "BTN_TR", 0x137 },
-	{ "BTN_TL2", 0x138 },
-	{ "BTN_TR2", 0x139 },
-	{ "BTN_SELECT", 0x13a },
-	{ "BTN_START", 0x13b },
-	{ "BTN_MODE", 0x13c },
-	{ "BTN_THUMBL", 0x13d },
-	{ "BTN_THUMBR", 0x13e },
-	{ "BTN_DIGI", 0x140 },
-	{ "BTN_TOOL_PEN", 0x140 },
-	{ "BTN_TOOL_RUBBER", 0x141 },
-	{ "BTN_TOOL_BRUSH", 0x142 },
-	{ "BTN_TOOL_PENCIL", 0x143 },
-	{ "BTN_TOOL_AIRBRUSH", 0x144 },
-	{ "BTN_TOOL_FINGER", 0x145 },
-	{ "BTN_TOOL_MOUSE", 0x146 },
-	{ "BTN_TOOL_LENS", 0x147 },
-	{ "BTN_TOUCH", 0x14a },
-	{ "BTN_STYLUS", 0x14b },
-	{ "BTN_STYLUS2", 0x14c },
-	{ "BTN_TOOL_DOUBLETAP", 0x14d },
-	{ "BTN_TOOL_TRIPLETAP", 0x14e },
-	{ "BTN_TOOL_QUADTAP", 0x14f },
-	{ "BTN_WHEEL", 0x150 },
-	{ "BTN_GEAR_DOWN", 0x150 },
-	{ "BTN_GEAR_UP", 0x151 },
-	{ "KEY_OK", 0x160 },
-	{ "KEY_SELECT", 0x161 },
-	{ "KEY_GOTO", 0x162 },
-	{ "KEY_CLEAR", 0x163 },
-	{ "KEY_POWER2", 0x164 },
-	{ "KEY_OPTION", 0x165 },
-	{ "KEY_INFO", 0x166 },
-	{ "KEY_TIME", 0x167 },
-	{ "KEY_VENDOR", 0x168 },
-	{ "KEY_ARCHIVE", 0x169 },
-	{ "KEY_PROGRAM", 0x16a },
-	{ "KEY_CHANNEL", 0x16b },
-	{ "KEY_FAVORITES", 0x16c },
-	{ "KEY_EPG", 0x16d },
-	{ "KEY_PVR", 0x16e },
-	{ "KEY_MHP", 0x16f },
-	{ "KEY_LANGUAGE", 0x170 },
-	{ "KEY_TITLE", 0x171 },
-	{ "KEY_SUBTITLE", 0x172 },
-	{ "KEY_ANGLE", 0x173 },
-	{ "KEY_ZOOM", 0x174 },
-	{ "KEY_MODE", 0x175 },
-	{ "KEY_KEYBOARD", 0x176 },
-	{ "KEY_SCREEN", 0x177 },
-	{ "KEY_PC", 0x178 },
-	{ "KEY_TV", 0x179 },
-	{ "KEY_TV2", 0x17a },
-	{ "KEY_VCR", 0x17b },
-	{ "KEY_VCR2", 0x17c },
-	{ "KEY_SAT", 0x17d },
-	{ "KEY_SAT2", 0x17e },
-	{ "KEY_CD", 0x17f },
-	{ "KEY_TAPE", 0x180 },
-	{ "KEY_RADIO", 0x181 },
-	{ "KEY_TUNER", 0x182 },
-	{ "KEY_PLAYER", 0x183 },
-	{ "KEY_TEXT", 0x184 },
-	{ "KEY_DVD", 0x185 },
-	{ "KEY_AUX", 0x186 },
-	{ "KEY_MP3", 0x187 },
-	{ "KEY_AUDIO", 0x188 },
-	{ "KEY_VIDEO", 0x189 },
-	{ "KEY_DIRECTORY", 0x18a },
-	{ "KEY_LIST", 0x18b },
-	{ "KEY_MEMO", 0x18c },
-	{ "KEY_CALENDAR", 0x18d },
-	{ "KEY_RED", 0x18e },
-	{ "KEY_GREEN", 0x18f },
-	{ "KEY_YELLOW", 0x190 },
-	{ "KEY_BLUE", 0x191 },
-	{ "KEY_CHANNELUP", 0x192 },
-	{ "KEY_CHANNELDOWN", 0x193 },
-	{ "KEY_FIRST", 0x194 },
-	{ "KEY_LAST", 0x195 },
-	{ "KEY_AB", 0x196 },
-	{ "KEY_NEXT", 0x197 },
-	{ "KEY_RESTART", 0x198 },
-	{ "KEY_SLOW", 0x199 },
-	{ "KEY_SHUFFLE", 0x19a },
-	{ "KEY_BREAK", 0x19b },
-	{ "KEY_PREVIOUS", 0x19c },
-	{ "KEY_DIGITS", 0x19d },
-	{ "KEY_TEEN", 0x19e },
-	{ "KEY_TWEN", 0x19f },
-	{ "KEY_VIDEOPHONE", 0x1a0 },
-	{ "KEY_GAMES", 0x1a1 },
-	{ "KEY_ZOOMIN", 0x1a2 },
-	{ "KEY_ZOOMOUT", 0x1a3 },
-	{ "KEY_ZOOMRESET", 0x1a4 },
-	{ "KEY_WORDPROCESSOR", 0x1a5 },
-	{ "KEY_EDITOR", 0x1a6 },
-	{ "KEY_SPREADSHEET", 0x1a7 },
-	{ "KEY_GRAPHICSEDITOR", 0x1a8 },
-	{ "KEY_PRESENTATION", 0x1a9 },
-	{ "KEY_DATABASE", 0x1aa },
-	{ "KEY_NEWS", 0x1ab },
-	{ "KEY_VOICEMAIL", 0x1ac },
-	{ "KEY_ADDRESSBOOK", 0x1ad },
-	{ "KEY_MESSENGER", 0x1ae },
-	{ "KEY_DISPLAYTOGGLE", 0x1af },
-	{ "KEY_SPELLCHECK", 0x1b0 },
-	{ "KEY_LOGOFF", 0x1b1 },
-	{ "KEY_DOLLAR", 0x1b2 },
-	{ "KEY_EURO", 0x1b3 },
-	{ "KEY_FRAMEBACK", 0x1b4 },
-	{ "KEY_FRAMEFORWARD", 0x1b5 },
-	{ "KEY_CONTEXT_MENU", 0x1b6 },
-	{ "KEY_MEDIA_REPEAT", 0x1b7 },
-	{ "KEY_10CHANNELSUP", 0x1b8 },
-	{ "KEY_10CHANNELSDOWN", 0x1b9 },
-	{ "KEY_IMAGES", 0x1ba },
-	{ "KEY_DEL_EOL", 0x1c0 },
-	{ "KEY_DEL_EOS", 0x1c1 },
-	{ "KEY_INS_LINE", 0x1c2 },
-	{ "KEY_DEL_LINE", 0x1c3 },
-	{ "KEY_FN", 0x1d0 },
-	{ "KEY_FN_ESC", 0x1d1 },
-	{ "KEY_FN_F1", 0x1d2 },
-	{ "KEY_FN_F2", 0x1d3 },
-	{ "KEY_FN_F3", 0x1d4 },
-	{ "KEY_FN_F4", 0x1d5 },
-	{ "KEY_FN_F5", 0x1d6 },
-	{ "KEY_FN_F6", 0x1d7 },
-	{ "KEY_FN_F7", 0x1d8 },
-	{ "KEY_FN_F8", 0x1d9 },
-	{ "KEY_FN_F9", 0x1da },
-	{ "KEY_FN_F10", 0x1db },
-	{ "KEY_FN_F11", 0x1dc },
-	{ "KEY_FN_F12", 0x1dd },
-	{ "KEY_FN_1", 0x1de },
-	{ "KEY_FN_2", 0x1df },
-	{ "KEY_FN_D", 0x1e0 },
-	{ "KEY_FN_E", 0x1e1 },
-	{ "KEY_FN_F", 0x1e2 },
-	{ "KEY_FN_S", 0x1e3 },
-	{ "KEY_FN_B", 0x1e4 },
-	{ "KEY_BRL_DOT1", 0x1f1 },
-	{ "KEY_BRL_DOT2", 0x1f2 },
-	{ "KEY_BRL_DOT3", 0x1f3 },
-	{ "KEY_BRL_DOT4", 0x1f4 },
-	{ "KEY_BRL_DOT5", 0x1f5 },
-	{ "KEY_BRL_DOT6", 0x1f6 },
-	{ "KEY_BRL_DOT7", 0x1f7 },
-	{ "KEY_BRL_DOT8", 0x1f8 },
-	{ "KEY_BRL_DOT9", 0x1f9 },
-	{ "KEY_BRL_DOT10", 0x1fa },
-	{ "KEY_NUMERIC_0", 0x200 },
-	{ "KEY_NUMERIC_1", 0x201 },
-	{ "KEY_NUMERIC_2", 0x202 },
-	{ "KEY_NUMERIC_3", 0x203 },
-	{ "KEY_NUMERIC_4", 0x204 },
-	{ "KEY_NUMERIC_5", 0x205 },
-	{ "KEY_NUMERIC_6", 0x206 },
-	{ "KEY_NUMERIC_7", 0x207 },
-	{ "KEY_NUMERIC_8", 0x208 },
-	{ "KEY_NUMERIC_9", 0x209 },
-	{ "KEY_NUMERIC_STAR", 0x20a },
-	{ "KEY_NUMERIC_POUND", 0x20b },
-	{ "KEY_CAMERA_FOCUS", 0x210 },
-	{ "KEY_WPS_BUTTON", 0x211 },
-	{ "KEY_TOUCHPAD_TOGGLE", 0x212 },
-	{ "KEY_TOUCHPAD_ON", 0x213 },
-	{ "KEY_TOUCHPAD_OFF", 0x214 },
-	{ "KEY_CAMERA_ZOOMIN", 0x215 },
-	{ "KEY_CAMERA_ZOOMOUT", 0x216 },
-	{ "KEY_CAMERA_UP", 0x217 },
-	{ "KEY_CAMERA_DOWN", 0x218 },
-	{ "KEY_CAMERA_LEFT", 0x219 },
-	{ "KEY_CAMERA_RIGHT", 0x21a },
-	{ "BTN_TRIGGER_HAPPY", 0x2c0 },
-	{ "BTN_TRIGGER_HAPPY1", 0x2c0 },
-	{ "BTN_TRIGGER_HAPPY2", 0x2c1 },
-	{ "BTN_TRIGGER_HAPPY3", 0x2c2 },
-	{ "BTN_TRIGGER_HAPPY4", 0x2c3 },
-	{ "BTN_TRIGGER_HAPPY5", 0x2c4 },
-	{ "BTN_TRIGGER_HAPPY6", 0x2c5 },
-	{ "BTN_TRIGGER_HAPPY7", 0x2c6 },
-	{ "BTN_TRIGGER_HAPPY8", 0x2c7 },
-	{ "BTN_TRIGGER_HAPPY9", 0x2c8 },
-	{ "BTN_TRIGGER_HAPPY10", 0x2c9 },
-	{ "BTN_TRIGGER_HAPPY11", 0x2ca },
-	{ "BTN_TRIGGER_HAPPY12", 0x2cb },
-	{ "BTN_TRIGGER_HAPPY13", 0x2cc },
-	{ "BTN_TRIGGER_HAPPY14", 0x2cd },
-	{ "BTN_TRIGGER_HAPPY15", 0x2ce },
-	{ "BTN_TRIGGER_HAPPY16", 0x2cf },
-	{ "BTN_TRIGGER_HAPPY17", 0x2d0 },
-	{ "BTN_TRIGGER_HAPPY18", 0x2d1 },
-	{ "BTN_TRIGGER_HAPPY19", 0x2d2 },
-	{ "BTN_TRIGGER_HAPPY20", 0x2d3 },
-	{ "BTN_TRIGGER_HAPPY21", 0x2d4 },
-	{ "BTN_TRIGGER_HAPPY22", 0x2d5 },
-	{ "BTN_TRIGGER_HAPPY23", 0x2d6 },
-	{ "BTN_TRIGGER_HAPPY24", 0x2d7 },
-	{ "BTN_TRIGGER_HAPPY25", 0x2d8 },
-	{ "BTN_TRIGGER_HAPPY26", 0x2d9 },
-	{ "BTN_TRIGGER_HAPPY27", 0x2da },
-	{ "BTN_TRIGGER_HAPPY28", 0x2db },
-	{ "BTN_TRIGGER_HAPPY29", 0x2dc },
-	{ "BTN_TRIGGER_HAPPY30", 0x2dd },
-	{ "BTN_TRIGGER_HAPPY31", 0x2de },
-	{ "BTN_TRIGGER_HAPPY32", 0x2df },
-	{ "BTN_TRIGGER_HAPPY33", 0x2e0 },
-	{ "BTN_TRIGGER_HAPPY34", 0x2e1 },
-	{ "BTN_TRIGGER_HAPPY35", 0x2e2 },
-	{ "BTN_TRIGGER_HAPPY36", 0x2e3 },
-	{ "BTN_TRIGGER_HAPPY37", 0x2e4 },
-	{ "BTN_TRIGGER_HAPPY38", 0x2e5 },
-	{ "BTN_TRIGGER_HAPPY39", 0x2e6 },
-	{ "BTN_TRIGGER_HAPPY40", 0x2e7 },
-	{ NULL, 0 },
+
+static struct wiimote_config wiimote_defaults[KEY_LAYOUT_NUM] = {
+  [KEY_LAYOUT_DEFAULT] = {
+    .motion_source = WIIMOTE_MOTION_SOURCE_NONE,
+    .ir = {
+      .avg_radius = IR_AVG_RADIUS,
+      .avg_max_samples = IR_AVG_MAX_SAMPLES,
+      .avg_min_samples = IR_AVG_MIN_SAMPLES,
+      .avg_weight = IR_AVG_WEIGHT,
+      .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
+      .continuous_scroll_border_x = IR_CONTINUOUS_SCROLL_BORDER_X,
+      .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
+      .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
+      .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .remove_rotation = TRUE,
+    },
+    .accelerometer = {
+      .max_angle_delta = ACCELEROMETER_MAX_ANGLE_DELTA,
+    },
+    .motionplus = {
+      .x = 0,
+      .y = 1,
+      .z = 2,
+      .x_scale = 1,
+      .y_scale = 1,
+      .z_scale = 1,
+    },
+    .keys = {
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELUP },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
+      [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+      [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E},
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC},
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_IGNORE, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+      [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+    }
+  },
+  [KEY_LAYOUT_IR] = {
+    .motion_source = WIIMOTE_MOTION_SOURCE_IR,
+    .ir = {
+      .avg_radius = IR_AVG_RADIUS,
+      .avg_max_samples = IR_AVG_MAX_SAMPLES,
+      .avg_min_samples = IR_AVG_MIN_SAMPLES,
+      .avg_weight = IR_AVG_WEIGHT,
+      .keymap_expiry_secs = IR_KEYMAP_EXPIRY_SECS,
+      .continuous_scroll_border_x = IR_CONTINUOUS_SCROLL_BORDER_X,
+      .continuous_scroll_border_y = IR_CONTINUOUS_SCROLL_BORDER_Y,
+      .continuous_scroll_max_x = IR_CONTINUOUS_SCROLL_MAX_X,
+      .continuous_scroll_max_y = IR_CONTINUOUS_SCROLL_MAX_Y,
+      .remove_rotation = TRUE,
+    },
+    .accelerometer = {
+      .max_angle_delta = ACCELEROMETER_MAX_ANGLE_DELTA,
+    },
+    .motionplus = {
+      .x = 0,
+      .y = 1,
+      .z = 2,
+      .x_scale = 1,
+      .y_scale = 1,
+      .z_scale = 1,
+    },
+    .keys = {
+      [WIIMOTE_KEY_LEFT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELUP },
+      [WIIMOTE_KEY_RIGHT] = { .type = FUNC_BTN, .u.btn = BUTTON_WHEELDOWN },
+      [WIIMOTE_KEY_UP] = { .type = FUNC_KEY, .u.key = KEY_UP },
+      [WIIMOTE_KEY_DOWN] = { .type = FUNC_KEY, .u.key = KEY_DOWN },
+      [WIIMOTE_KEY_A] = { .type = FUNC_BTN, .u.btn = BUTTON_RIGHT },
+      [WIIMOTE_KEY_B] = { .type = FUNC_BTN, .u.btn = BUTTON_LEFT },
+      [WIIMOTE_KEY_PLUS] = { .type = FUNC_KEY, .u.key = KEY_E, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_MINUS] = { .type = FUNC_KEY, .u.key = KEY_ESC, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_HOME] = { .type = FUNC_IGNORE, .ir_mode = KEY_IR_MODE_TOGGLE },
+      [WIIMOTE_KEY_ONE] = { .type = FUNC_KEY, .u.key = KEY_1 },
+      [WIIMOTE_KEY_TWO] = { .type = FUNC_KEY, .u.key = KEY_2 },
+    }
+  }
 };
 
-static void parse_key(struct xwiimote_dev *dev, const char *key, struct func *out)
-{
-	unsigned int i;
 
-	if (!key)
-		return;
+static struct nunchuk_config nunchuk_defaults[KEY_STATE_NUM] = {
+	[KEY_LAYOUT_DEFAULT] = {
+    .analog_stick = {
+      .shape = ANALOG_STICK_SHAPE_OCTEGON,
+      .x = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_D,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_A,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+      .y = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_W,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_S,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+    },
+    .keys = {
+      [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+    }
+	},
 
-	if (!strcasecmp(key, "none") ||
-			!strcasecmp(key, "off") ||
-			!strcasecmp(key, "0") ||
-			!strcasecmp(key, "false")) {
-		out->type = FUNC_IGNORE;
-	} else if (!strcasecmp(key, "left-button")) {
-		out->type = FUNC_BTN;
-		out->u.btn = 1;
-	} else if (!strcasecmp(key, "right-button")) {
-		out->type = FUNC_BTN;
-		out->u.btn = 3;
-	} else if (!strcasecmp(key, "middle-button")) {
-		out->type = FUNC_BTN;
-		out->u.btn = 2;
-	} else {
-		for (i = 0; key2value[i].key; ++i) {
-			if (!strcasecmp(key2value[i].key, key))
-				break;
-		}
+	[KEY_LAYOUT_IR] = {
+    .analog_stick = {
+      .shape = ANALOG_STICK_SHAPE_OCTEGON,
+      .x = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_D,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_A,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+      .y = {
+        .mode = ANALOG_STICK_AXIS_MODE_NONE,
+        .high = {
+          .type = FUNC_KEY,
+          .u.key = KEY_W,
+        },
+        .low = {
+          .type = FUNC_KEY,
+          .u.key = KEY_S,
+        },
+        .amplify = ANALOG_STICK_AXIS_AMPLIFY_DEFAULT,
+        .deadzone = ANALOG_STICK_AXIS_DEADZONE_DEFAULT,
+      },
+    },
+    .keys = {
+      [NUNCHUK_KEY_C] = { .type = FUNC_KEY, .u.key = KEY_LEFTCTRL },
+      [NUNCHUK_KEY_Z] = { .type = FUNC_KEY, .u.key = KEY_SPACE },
+    }
+	},
+};
 
-		if (key2value[i].key) {
-			out->type = FUNC_KEY;
-			out->u.key = key2value[i].value;
-		} else {
-			xf86IDrvMsg(dev->info, X_ERROR,
-						"Invalid key option %s\n", key);
-			out->type = FUNC_IGNORE;
-		}
-	}
-}
-
-static void parse_axis(struct xwiimote_dev *dev, const char *t,
-		       unsigned int *out, unsigned int def)
-{
-	if (!t)
-		return;
-
-	if (!strcasecmp(t, "x"))
-		*out = 0;
-	else if (!strcasecmp(t, "y"))
-		*out = 1;
-	else if (!strcasecmp(t, "z"))
-		*out = 2;
-}
-
-static void parse_scale(struct xwiimote_dev *dev, const char *t, int *out)
-{
-	if (!t)
-		return;
-
-	*out = atoi(t);
-}
-
-static void xwiimote_configure_mp(struct xwiimote_dev *dev)
-{
-	const char *normalize, *factor, *t;
-	int x, y, z, fac;
-
-	/* TODO: Allow modifying x, y, z and factor via xinput-properties for
-	 * run-time calibration. */
-
-	factor = xf86FindOptionValue(dev->info->options, "MPCalibrationFactor");
-	if (!factor)
-		factor = "";
-
-	if (!strcasecmp(factor, "on") ||
-	    !strcasecmp(factor, "true") ||
-	    !strcasecmp(factor, "yes"))
-		fac = 50;
-	else if (sscanf(factor, "%i", &fac) != 1)
-		fac = 0;
-
-	normalize = xf86FindOptionValue(dev->info->options, "MPNormalization");
-	if (!normalize)
-		normalize = "";
-
-	if (!strcasecmp(normalize, "on") ||
-	    !strcasecmp(normalize, "true") ||
-	    !strcasecmp(normalize, "yes")) {
-		xwii_iface_set_mp_normalization(dev->iface, 0, 0, 0, fac);
-		xf86IDrvMsg(dev->info, X_INFO,
-			    "MP-Normalizer started with (0:0:0) * %i\n", fac);
-	} else if (sscanf(normalize, "%i:%i:%i", &x, &y, &z) == 3) {
-		xwii_iface_set_mp_normalization(dev->iface, x, y, z, fac);
-		xf86IDrvMsg(dev->info, X_INFO,
-			    "MP-Normalizer started with (%i:%i:%i) * %i\n",
-			    x, y, z, fac);
-	}
-
-	t = xf86FindOptionValue(dev->info->options, "MPXAxis");
-	parse_axis(dev, t, &dev->mp_x, 0);
-	t = xf86FindOptionValue(dev->info->options, "MPXScale");
-	parse_scale(dev, t, &dev->mp_x_scale);
-	t = xf86FindOptionValue(dev->info->options, "MPYAxis");
-	parse_axis(dev, t, &dev->mp_y, 1);
-	t = xf86FindOptionValue(dev->info->options, "MPYScale");
-	parse_scale(dev, t, &dev->mp_y_scale);
-	t = xf86FindOptionValue(dev->info->options, "MPZAxis");
-	parse_axis(dev, t, &dev->mp_z, 2);
-	t = xf86FindOptionValue(dev->info->options, "MPZScale");
-	parse_scale(dev, t, &dev->mp_z_scale);
-}
-
-static void xwiimote_configure_ir(struct xwiimote_dev *dev)
-{
-	const char *t;
-
-	t = xf86FindOptionValue(dev->info->options, "IRAvgRadius");
-	parse_scale(dev, t, &dev->ir_avg_radius);
-
-	t = xf86FindOptionValue(dev->info->options, "IRAvgMaxSamples");
-	parse_scale(dev, t, &dev->ir_avg_max_samples);
-	if (dev->ir_avg_max_samples < 1) dev->ir_avg_max_samples = 1;
-
-	t = xf86FindOptionValue(dev->info->options, "IRAvgMinSamples");
-	parse_scale(dev, t, &dev->ir_avg_min_samples);
-	if (dev->ir_avg_min_samples < 1) {
-		dev->ir_avg_min_samples = 1;
-	} else if (dev->ir_avg_min_samples > dev->ir_avg_max_samples) {
-		dev->ir_avg_min_samples = dev->ir_avg_max_samples;
-	}
-
-	t = xf86FindOptionValue(dev->info->options, "IRAvgWeight");
-	parse_scale(dev, t, &dev->ir_avg_weight);
-	if (dev->ir_avg_weight < 0) dev->ir_avg_weight = 0;
-
-	t = xf86FindOptionValue(dev->info->options, "IRKeymapExpirySecs");
-	parse_scale(dev, t, &dev->ir_keymap_expiry_secs);
-}
-
-static void xwiimote_configure(struct xwiimote_dev *dev)
-{
-	const char *motion, *key;
-
-	memcpy(dev->map_key[KEYSET_NORMAL], map_key_default, sizeof(map_key_default));
-	memcpy(dev->map_key[KEYSET_IR], map_key_default, sizeof(map_key_default));
-
-	motion = xf86FindOptionValue(dev->info->options, "MotionSource");
-	if (!motion)
-		motion = "";
-
-	if (!strcasecmp(motion, "accelerometer")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_ACCEL;
-		dev->ifs |= XWII_IFACE_ACCEL;
-	} else if (!strcasecmp(motion, "ir")) {
-		dev->motion = MOTION_ABS;
-		dev->motion_source = SOURCE_IR;
-		dev->ifs |= XWII_IFACE_IR;
-	} else if (!strcasecmp(motion, "motionplus")) {
-		dev->motion = MOTION_REL;
-		dev->motion_source = SOURCE_MOTIONPLUS;
-		dev->ifs |= XWII_IFACE_MOTION_PLUS;
-	}
-
-	key = xf86FindOptionValue(dev->info->options, "MapLeft");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_LEFT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapRight");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_RIGHT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapUp");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_UP]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapDown");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_DOWN]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapA");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_A]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapB");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_B]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapPlus");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_PLUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapMinus");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_MINUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapHome");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_HOME]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapOne");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_ONE]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapTwo");
-	parse_key(dev, key, &dev->map_key[KEYSET_NORMAL][XWII_KEY_TWO]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRLeft");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_LEFT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRRight");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_RIGHT]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRUp");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_UP]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRDown");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_DOWN]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRA");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_A]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRB");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_B]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRPlus");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_PLUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRMinus");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_MINUS]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRHome");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_HOME]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIROne");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_ONE]);
-
-	key = xf86FindOptionValue(dev->info->options, "MapIRTwo");
-	parse_key(dev, key, &dev->map_key[KEYSET_IR][XWII_KEY_TWO]);
-
-	xwiimote_configure_mp(dev);
-	xwiimote_configure_ir(dev);
-}
 
 static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 {
 	struct xwiimote_dev *dev;
 	int ret;
+  struct motionplus_config *motionplus_config;
 
 	dev = malloc(sizeof(*dev));
 	if (!dev)
@@ -1541,23 +821,16 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	memset(dev, 0, sizeof(*dev));
 	dev->info = info;
 	dev->dev_id = -1;
+  dev->motion_layout = KEY_LAYOUT_DEFAULT;
 	info->private = dev;
 	info->type_name = (char*)XI_MOUSE;
 	info->device_control = xwiimote_control;
 	info->read_input = NULL;
 	info->switch_mode = NULL;
 	info->fd = -1;
-	dev->mp_x = 0;
-	dev->mp_y = 1;
-	dev->mp_z = 2;
-	dev->mp_x_scale = 1;
-	dev->mp_y_scale = 1;
-	dev->mp_z_scale = 1;
-	dev->ir_avg_radius = XWIIMOTE_IR_AVG_RADIUS;
-	dev->ir_avg_max_samples = XWIIMOTE_IR_AVG_MAX_SAMPLES;
-	dev->ir_avg_min_samples = XWIIMOTE_IR_AVG_MIN_SAMPLES;
-	dev->ir_avg_weight = XWIIMOTE_IR_AVG_WEIGHT;
-	dev->ir_keymap_expiry_secs = XWIIMOTE_IR_KEYMAP_EXPIRY_SECS;
+
+  preinit_wiimote(&dev->wiimote_config[KEY_LAYOUT_IR]);
+  preinit_wiimote(&dev->wiimote_config[KEY_LAYOUT_DEFAULT]);
 
 	dev->device = xf86FindOptionValue(info->options, "Device");
 	if (!dev->device) {
@@ -1589,7 +862,24 @@ static int xwiimote_preinit(InputDriverPtr drv, InputInfoPtr info, int flags)
 	}
 
 	xwiimote_add_dev(dev);
-	xwiimote_configure(dev);
+
+  configure_wiimote(&dev->wiimote_config[KEY_LAYOUT_DEFAULT], "Map", &wiimote_defaults[KEY_LAYOUT_DEFAULT], info);
+  configure_wiimote(&dev->wiimote_config[KEY_LAYOUT_IR], "MapIR", &wiimote_defaults[KEY_LAYOUT_IR], info);
+
+  configure_nunchuk(&dev->nunchuk_config[KEY_LAYOUT_DEFAULT], "Map", &nunchuk_defaults[KEY_LAYOUT_DEFAULT], info);
+  configure_nunchuk(&dev->nunchuk_config[KEY_LAYOUT_IR], "MapIR", &nunchuk_defaults[KEY_LAYOUT_IR], info);
+
+  motionplus_config = &dev->wiimote_config[KEY_LAYOUT_DEFAULT].motionplus;
+  xwii_iface_set_mp_normalization(dev->iface, 
+    motionplus_config->x_normalization, 
+    motionplus_config->y_normalization,
+    motionplus_config->z_normalization,
+    motionplus_config->factor);
+  xf86IDrvMsg(info, X_INFO, "-Normalizer started with (%i:%i:%i) * %i\n",
+    motionplus_config->x_normalization, 
+    motionplus_config->y_normalization,
+    motionplus_config->z_normalization,
+    motionplus_config->factor);
 
 	return Success;
 
@@ -1617,6 +907,7 @@ static void xwiimote_uninit(InputDriverPtr drv, InputInfoPtr info, int flags)
 		free(dev);
 		info->private = NULL;
 	}
+
 
 	xf86DeleteInput(info, flags);
 }
@@ -1672,3 +963,4 @@ _X_EXPORT XF86ModuleData xwiimoteModuleData =
 	&xwiimote_plug,
 	&xwiimote_unplug,
 };
+
