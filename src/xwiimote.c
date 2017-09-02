@@ -525,7 +525,7 @@ static void xwiimote_ir(struct xwiimote_dev *dev, struct xwii_event *ev)
 	a->x = (a->x + b->x) / 2;
 	a->y = (a->y + b->y) / 2;
 
-	/* Start averaging if the location is consistant */
+	/* Start averaging if the location is consistent */
 	dev->ir_avg_x = (dev->ir_avg_x * dev->ir_avg_count + a->x) / (dev->ir_avg_count+1);
 	dev->ir_avg_y = (dev->ir_avg_y * dev->ir_avg_count + a->y) / (dev->ir_avg_count+1);
 	if (++dev->ir_avg_count > dev->ir_avg_max_samples)
